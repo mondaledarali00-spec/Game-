@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Fire Zone — Battle Royale</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; touch-action:none; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Segoe UI', Arial, sans-serif; color:#fff; }
+  #game { position:fixed; inset:0; display:block; }
+
+  /* ---------- generic ---------- */
+  .hidden { display:none !important; }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #hud > * { pointer-events:none; }
+
+  /* ---------- top bar ---------- */
+  #topbar { position:absolute; top:calc(6px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; }
+  .chip { background:rgba(10,10,14,.72); border:1px solid rgba(255,140,0,.55); border-radius:20px; padding:4px 14px; font-weight:700; font-size:14px; letter-spacing:.5px; display:flex; gap:8px; align-items:center; }
+  .chip .ic { color:#ffa030; }
+  #aliveVal, #killVal { color:#ffd23f; }
+  #zoneChip.warn { border-color:#ff4d4d; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { box-shadow:0 0 12px rgba(255,60,60,.8);} }
+
+  /* ---------- kill feed ---------- */
+  #killfeed { position:absolute; top:calc(8px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); width:290px; font-size:12px; }
+  .feed { background:rgba(8,8,12,.7); border-left:3px solid #ff8c1a; border-radius:6px; padding:4px 8px; margin-bottom:5px; animation: slidein .2s ease-out; }
+  .feed .me { color:#ffd23f; font-weight:700; }
+  .feed .red { color:#ff5b5b; font-weight:700; }
+  .feed .dim { opacity:.85; }
+  @keyframes slidein { from { transform:translateX(-30px); opacity:0; } }
+
+  /* ---------- minimap ---------- */
+  #minimap { position:absolute; top:calc(8px + env(safe-area-inset-top)); right:calc(10px + env(safe-area-inset-right)); width:132px; height:132px; border-radius:50%; border:2px solid rgba(255,140,0,.6); background:rgba(6,10,6,.8); }
+
+  /* ---------- crosshair / hit ---------- */
+  #crosshair { position:absolute; left:50%; top:50%; width:34px; height:34px; transform:translate(-50%,-50%); }
+  #crosshair .l { position:absolute; background:#fff; box-shadow:0 0 3px #000; transition:all .05s; }
+  #crosshair .l.t { left:16px; top:0;  width:2px; height:9px; }
+  #crosshair .l.b { left:16px; bottom:0; width:2px; height:9px; }
+  #crosshair .l.lf { left:0;  top:16px; width:9px; height:2px; }
+  #crosshair .l.rt { right:0; top:16px; width:9px; height:2px; }
+  #hitmarker { position:absolute; left:50%; top:50%; width:44px; height:44px; transform:translate(-50%,-50%) rotate(45deg); opacity:0; }
+  #hitmarker .l { position:absolute; background:#ff4d4d; box-shadow:0 0 4px #000; }
+  #hitmarker .l.a { left:0;  top:0;  width:12px; height:3px; }
+  #hitmarker .l.b { right:0; top:0;  width:3px;  height:12px; }
+  #hitmarker .l.c { left:0;  bottom:0; width:3px; height:12px; }
+  #hitmarker .l.d { right:0; bottom:0; width:12px; height:3px; }
+  #hitmarker.kill .l { background:#ffd23f; }
+
+  #vignette { position:absolute; inset:0; box-shadow: inset 0 0 120px 40px rgba(255,0,0,.85); opacity:0; transition:opacity .25s; }
+
+  /* ---------- bottom left: health ---------- */
+  #bottomleft { position:absolute; left:calc(14px + env(safe-area-inset-left)); bottom:calc(12px + env(safe-area-inset-bottom)); width:min(30vw, 250px); }
+  #hpbar { height:14px; background:rgba(0,0,0,.65); border:1px solid rgba(255,255,255,.35); border-radius:8px; overflow:hidden; }
+  #hpfill { height:100%; width:100%; background:linear-gradient(90deg,#27c93f,#7dff8e); transition:width .2s; }
+  #hpfill.low { background:linear-gradient(90deg,#d81f1f,#ff6a6a); }
+  #hprow { display:flex; justify-content:space-between; font-size:12px; font-weight:700; margin-bottom:3px; text-shadow:0 1px 2px #000; }
+  #medrow { font-size:11px; margin-top:3px; color:#b7ffb7; text-shadow:0 1px 2px #000; }
+
+  /* ---------- bottom right: weapon + controls ---------- */
+  #weaponbox { position:absolute; right:calc(150px + env(safe-area-inset-right)); bottom:calc(14px + env(safe-area-inset-bottom)); text-align:right; text-shadow:0 1px 3px #000; }
+  #wname { font-size:14px; font-weight:800; letter-spacing:1px; color:#ffd23f; }
+  #ammo { font-size:26px; font-weight:900; }
+  #ammo span { font-size:15px; color:#bbb; }
+
+  .btn { position:absolute; border-radius:50%; background:rgba(12,12,18,.55); border:2px solid rgba(255,255,255,.35); color:#fff; display:flex; align-items:center; justify-content:center; flex-direction:column; font-weight:800; pointer-events:auto; text-shadow:0 1px 2px #000; }
+  .btn:active, .btn.on { background:rgba(255,140,26,.5); border-color:#ffa030; }
+  #fireBtn { width:88px; height:88px; right:calc(18px + env(safe-area-inset-right)); bottom:calc(70px + env(safe-area-inset-bottom)); font-size:15px; border-color:rgba(255,80,40,.8); background:rgba(140,30,10,.45); }
+  #fireBtn:active,#fireBtn.on { background:rgba(255,90,30,.65); }
+  #reloadBtn { width:52px; height:52px; right:calc(122px + env(safe-area-inset-right)); bottom:calc(120px + env(safe-area-inset-bottom)); font-size:10px; }
+  #swapBtn { width:52px; height:52px; right:calc(122px + env(safe-area-inset-right)); bottom:calc(52px + env(safe-area-inset-bottom)); font-size:10px; }
+  #medBtn { width:46px; height:46px; right:calc(20px + env(safe-area-inset-right)); bottom:calc(172px + env(safe-area-inset-bottom)); font-size:16px; }
+  #pauseBtn { width:38px; height:38px; top:calc(150px + env(safe-area-inset-top)); right:calc(18px + env(safe-area-inset-right)); font-size:12px; }
+  #jumpBtn { width:52px; height:52px; right:calc(30px + env(safe-area-inset-right)); bottom:calc(178px + env(safe-area-inset-bottom)); font-size:10px; }
+
+  /* ---------- joystick ---------- */
+  #stick { position:absolute; left:calc(26px + env(safe-area-inset-left)); bottom:calc(26px + env(safe-area-inset-bottom)); width:124px; height:124px; border-radius:50%; background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.25); pointer-events:auto; }
+  #knob { position:absolute; left:50%; top:50%; width:52px; height:52px; border-radius:50%; background:rgba(255,160,48,.55); border:2px solid #ffa030; transform:translate(-50%,-50%); }
+
+  /* ---------- banners / toasts ---------- */
+  #banner { position:absolute; top:22%; left:50%; transform:translateX(-50%); font-size:26px; font-weight:900; letter-spacing:2px; color:#ffd23f; text-shadow:0 2px 6px #000, 0 0 18px rgba(255,150,0,.6); opacity:0; transition:opacity .3s; white-space:nowrap; }
+  #banner.red { color:#ff5b5b; }
+  #toast { position:absolute; bottom:26%; left:50%; transform:translateX(-50%); background:rgba(8,8,12,.75); border:1px solid rgba(255,210,63,.6); padding:6px 16px; border-radius:18px; font-size:13px; font-weight:700; opacity:0; transition:opacity .25s; white-space:nowrap; }
+  #medbar { position:absolute; bottom:20%; left:50%; transform:translateX(-50%); width:180px; height:10px; background:rgba(0,0,0,.6); border:1px solid #7dff8e; border-radius:6px; overflow:hidden; opacity:0; }
+  #medfill { height:100%; width:0; background:#27c93f; }
+
+  /* ---------- screens ---------- */
+  .screen { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(ellipse at center, rgba(30,10,0,.82), rgba(0,0,0,.94)); pointer-events:auto; text-align:center; }
+  .title { font-size:clamp(38px, 9vw, 84px); font-weight:900; letter-spacing:4px; background:linear-gradient(180deg,#ffd23f,#ff7b1a); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 4px 10px rgba(255,120,0,.45)); }
+  .subtitle { font-size:clamp(13px, 2.6vw, 20px); letter-spacing:6px; color:#ffb36b; margin-top:2px; font-weight:700; }
+  .bigbtn { margin-top:26px; padding:14px 46px; font-size:20px; font-weight:900; letter-spacing:2px; color:#fff; background:linear-gradient(180deg,#ff9d2e,#ff6a00); border:none; border-radius:32px; box-shadow:0 6px 22px rgba(255,110,0,.5); cursor:pointer; }
+  .bigbtn:active { transform:scale(.96); }
+  .ghostbtn { margin-top:14px; padding:10px 30px; font-size:15px; font-weight:700; color:#ffd8a8; background:transparent; border:1px solid #ff8c1a; border-radius:24px; cursor:pointer; }
+  .hint { margin-top:22px; font-size:12.5px; color:#cfa77e; line-height:1.7; max-width:86vw; }
+  .stats { margin-top:16px; font-size:18px; font-weight:700; color:#fff; }
+  .stats b { color:#ffd23f; }
+  #gameoverTitle { font-size:clamp(40px,10vw,90px); font-weight:900; letter-spacing:3px; }
+  #gameoverTitle.win { background:linear-gradient(180deg,#ffe98a,#ff9d00); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 24px rgba(255,170,0,.8)); }
+  #gameoverTitle.lose { color:#ff5b5b; text-shadow:0 0 24px rgba(255,40,40,.5); }
+
+  #pauseMenu .panel { background:rgba(14,14,20,.9); border:1px solid rgba(255,140,26,.5); border-radius:18px; padding:26px 44px; }
+
+  #err { position:fixed; left:0; right:0; bottom:0; background:rgba(120,0,0,.92); color:#fff; font:12px monospace; padding:6px 10px; z-index:99; white-space:pre-wrap; display:none; }
+
+  body.desktop #stick, body.desktop #fireBtn, body.desktop #reloadBtn, body.desktop #swapBtn,
+  body.desktop #medBtn, body.desktop #jumpBtn { display:none; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <div class="chip"><span class="ic">&#128101;</span><span id="aliveVal">20</span></div>
+    <div class="chip"><span class="ic">&#9876;&#65039;</span><span id="killVal">0</span></div>
+    <div class="chip" id="zoneChip"><span class="ic">&#9889;</span><span id="zoneTxt">—</span></div>
+  </div>
+  <div id="killfeed"></div>
+  <canvas id="minimap" width="132" height="132"></canvas>
+  <div id="crosshair"><div class="l t"></div><div class="l b"></div><div class="l lf"></div><div class="l rt"></div></div>
+  <div id="hitmarker"><div class="l a"></div><div class="l b"></div><div class="l c"></div><div class="l d"></div></div>
+  <div id="vignette"></div>
+  <div id="bottomleft">
+    <div id="hprow"><span id="hpTxt">100</span><span style="color:#9adf9a">HP</span></div>
+    <div id="hpbar"><div id="hpfill"></div></div>
+    <div id="medrow">&#9992;&#65039; Medkits: <span id="medVal">1</span></div>
+  </div>
+  <div id="weaponbox">
+    <div id="wname">M500 PISTOL</div>
+    <div id="ammo">8 <span>/ &#8734;</span></div>
+  </div>
+  <div class="btn" id="jumpBtn">&#8679;<span style="font-size:9px">JUMP</span></div>
+  <div class="btn" id="medBtn">&#9997;&#65039;</div>
+  <div class="btn" id="reloadBtn">&#8635;<span style="font-size:9px">RELOAD</span></div>
+  <div class="btn" id="swapBtn">&#8646;<span style="font-size:9px">SWAP</span></div>
+  <div class="btn" id="fireBtn">FIRE</div>
+  <div id="stick"><div id="knob"></div></div>
+  <div class="btn" id="pauseBtn">II</div>
+  <div id="banner"></div>
+  <div id="toast"></div>
+  <div id="medbar"><div id="medfill"></div></div>
+</div>
+
+<div id="menu" class="screen">
+  <div class="title">FIRE ZONE</div>
+  <div class="subtitle">BATTLE ROYALE &bull; 20 PLAYERS &bull; 1 WINNER</div>
+  <button class="bigbtn" id="playBtn">&#9992;&#65039; TAP TO DEPLOY</button>
+  <div class="hint" id="controlsHint">
+    Mobile: <b>left stick</b> move &bull; <b>drag right side</b> aim &bull; <b>FIRE</b> shoot<br>
+    Loot crates to find weapons &bull; Stay inside the safe zone &bull; Last one standing wins <b>BOOYAH!</b><br>
+    Desktop: <b>WASD</b> move &bull; <b>mouse</b> aim (click to lock) &bull; <b>LMB</b> fire &bull; <b>R</b> reload &bull; <b>Q</b> swap &bull; <b>H</b> medkit &bull; <b>Shift</b> sprint
+  </div>
+</div>
+
+<div id="gameover" class="screen hidden">
+  <div id="gameoverTitle" class="win">BOOYAH!</div>
+  <div class="stats" id="goStats"></div>
+  <button class="bigbtn" id="againBtn">PLAY AGAIN</button>
+  <button class="ghostbtn" id="menuBtn">MAIN MENU</button>
+</div>
+
+<div id="pauseMenu" class="screen hidden">
+  <div class="panel">
+    <div style="font-size:26px;font-weight:900;letter-spacing:3px;color:#ffd23f;">PAUSED</div>
+    <button class="bigbtn" id="resumeBtn" style="display:block;margin:22px auto 0;">RESUME</button>
+    <button class="ghostbtn" id="restartBtn" style="display:block;margin:0 auto;">RESTART MATCH</button>
+    <button class="ghostbtn" id="exitBtn" style="display:block;margin:0 auto;">EXIT GAME</button>
+  </div>
+</div>
+
+<div id="err"></div>
+
+<script src="three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

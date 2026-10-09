@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Optional CI signing: set these repo/env secrets to sign with a real key.
+// Without them, release APKs fall back to the auto-generated debug keystore
+// so the artifact is always installable for testing.
+def ciStoreFile = System.getenv("RELEASE_STORE_FILE")
+
+android {
+    namespace 'com.arena.firezone'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.arena.firezone"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        if (ciStoreFile != null) {
+            release {
+                storeFile file(ciStoreFile)
+                storePassword System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ciStoreFile != null ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+// No external dependencies: the game is a self-contained WebView app.
+dependencies {
+}
