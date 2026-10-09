@@ -102,6 +102,14 @@
 
   #pauseMenu .panel { background:rgba(14,14,20,.9); border:1px solid rgba(255,140,26,.5); border-radius:18px; padding:26px 44px; }
 
+  /* ---------- loader ---------- */
+  #loadbarWrap { margin-top: 30px; display: flex; align-items: center; gap: 12px; }
+  #loadbar { width: min(64vw, 380px); height: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,160,48,.5); border-radius: 8px; overflow: hidden; }
+  #loadfill { height: 100%; width: 0; background: linear-gradient(90deg, #ff9d2e, #ffd23f); border-radius: 8px; transition: width .25s ease; }
+  #loadPct { font-weight: 800; font-size: 14px; color: #ffd23f; width: 46px; text-align: left; }
+  #loadTxt { margin-top: 12px; font-size: 12px; letter-spacing: 2.5px; color: #ffb36b; font-weight: 700; min-height: 16px; }
+  #loadVer { position: absolute; bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 11px; color: #8a6a4a; letter-spacing: 1px; }
+
   #err { position:fixed; left:0; right:0; bottom:0; background:rgba(120,0,0,.92); color:#fff; font:12px monospace; padding:6px 10px; z-index:99; white-space:pre-wrap; display:none; }
 
   body.desktop #stick, body.desktop #fireBtn, body.desktop #reloadBtn, body.desktop #swapBtn,

@@ -18,8 +18,8 @@ function fmtTime(s) { s = Math.max(0, Math.ceil(s)); var m = Math.floor(s / 60);
 
 /* ---------------- config ---------------- */
 var CFG = {
-  mapR: 238,
-  botCount: 19,
+  mapR: 320,
+  botCount: 29,
   walkSpeed: 7.0,
   sprintSpeed: 9.8,
   botSpeed: 4.2,
@@ -32,23 +32,27 @@ var CFG = {
 };
 
 var WEAPONS = {
-  pistol:  { name: 'M500 PISTOL',   dmg: 16, rate: 0.32, mag: 10, reload: 1.1, range: 62, spread: 0.018, pellets: 1, bloom: 0.010, kick: 0.010, snd: 'pistol' },
+  pistol:  { name: 'M500 PISTOL',   dmg: 16, rate: 0.32, mag: 10, reload: 1.1, range: 62,  spread: 0.018, pellets: 1, bloom: 0.010, kick: 0.010, snd: 'pistol' },
   smg:     { name: 'MP40 SMG',      dmg: 9,  rate: 0.085, mag: 32, reload: 1.7, range: 48, spread: 0.038, pellets: 1, bloom: 0.006, kick: 0.005, snd: 'smg' },
   rifle:   { name: 'AK47 RIFLE',    dmg: 23, rate: 0.15, mag: 30, reload: 2.1, range: 95, spread: 0.020, pellets: 1, bloom: 0.009, kick: 0.009, snd: 'rifle' },
-  shotgun: { name: 'M1014 SHOTGUN', dmg: 10, rate: 0.95, mag: 6,  reload: 2.5, range: 27, spread: 0.075, pellets: 7, bloom: 0.020, kick: 0.030, snd: 'shotgun' }
+  scar:    { name: 'SCAR-L RIFLE',  dmg: 19, rate: 0.115, mag: 35, reload: 2.0, range: 90, spread: 0.015, pellets: 1, bloom: 0.006, kick: 0.006, snd: 'scar' },
+  lmg:     { name: 'M249 LMG',      dmg: 13, rate: 0.09, mag: 60, reload: 3.2, range: 80, spread: 0.045, pellets: 1, bloom: 0.005, kick: 0.007, snd: 'lmg' },
+  shotgun: { name: 'M1014 SHOTGUN', dmg: 10, rate: 0.95, mag: 6,  reload: 2.5, range: 27, spread: 0.075, pellets: 7, bloom: 0.020, kick: 0.030, snd: 'shotgun' },
+  sniper:  { name: 'M24 SNIPER',    dmg: 90, rate: 1.5, mag: 5,  reload: 2.8, range: 165, spread: 0.003, pellets: 1, bloom: 0.002, kick: 0.045, snd: 'sniper' }
 };
-var GUN_COLORS = { pistol: 0x708090, smg: 0x556677, rifle: 0x7a5230, shotgun: 0x6b4a33 };
+var GUN_COLORS = { pistol: 0x708090, smg: 0x556677, rifle: 0x7a5230, scar: 0x4f6228, lmg: 0x565244, shotgun: 0x6b4a33, sniper: 0x33402e };
 
 var BOT_NAMES = ['Viper', 'Ghost', 'Raptor', 'Nyx', 'Blaze', 'Frost', 'Havoc', 'Titan', 'Rex', 'Echo',
-  'Jett', 'Shadow', 'Krait', 'Mamba', 'Zero', 'Onyx', 'Falcon', 'Draco', 'Sable'];
+  'Jett', 'Shadow', 'Krait', 'Mamba', 'Zero', 'Onyx', 'Falcon', 'Draco', 'Sable', 'Rogue',
+  'Lynx', 'Pyro', 'Sage', 'Wolf', 'Ember', 'Quake', 'Nova', 'Venom', 'Bolt'];
 
 var ZONE_PHASES = [
-  { wait: 26, shrink: 24, to: 150, dps: 2 },
-  { wait: 20, shrink: 22, to: 92,  dps: 4 },
-  { wait: 16, shrink: 18, to: 52,  dps: 7 },
-  { wait: 14, shrink: 16, to: 26,  dps: 10 },
-  { wait: 12, shrink: 14, to: 10,  dps: 14 },
-  { wait: 10, shrink: 12, to: 3,   dps: 18 }
+  { wait: 30, shrink: 26, to: 190, dps: 2 },
+  { wait: 22, shrink: 24, to: 115, dps: 4 },
+  { wait: 18, shrink: 20, to: 66,  dps: 7 },
+  { wait: 15, shrink: 18, to: 34,  dps: 10 },
+  { wait: 13, shrink: 15, to: 14,  dps: 14 },
+  { wait: 11, shrink: 13, to: 4,   dps: 18 }
 ];
 
 /* ---------------- dom refs ---------------- */
@@ -111,6 +115,9 @@ var Sfx = {
     var v = clamp(1.6 / (1 + dist * 0.05), 0.05, 1);
     if (kind === 'shotgun') this.burst(420, 0.9, 0.22, v);
     else if (kind === 'rifle') this.burst(820, 0.8, 0.14, v);
+    else if (kind === 'scar') this.burst(950, 0.72, 0.12, v);
+    else if (kind === 'lmg') this.burst(650, 0.75, 0.16, v);
+    else if (kind === 'sniper') { this.burst(300, 1.0, 0.3, v); this.tone('sine', 150, 55, 0.28, v * 0.55); }
     else if (kind === 'smg') this.burst(1300, 0.5, 0.08, v);
     else this.burst(1000, 0.7, 0.12, v);
   },
@@ -168,7 +175,7 @@ function grassTexture() {
   }
   var t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(26, 26);
+  t.repeat.set(34, 34);
   return t;
 }
 
@@ -902,7 +909,7 @@ function updateSkirmish(dt) {
   skirmishT -= dt;
   if (skirmishT > 0) return;
   skirmishT = 1.6;
-  if (zone.r > 80) return;
+  if (zone.r > 110) return;
   var pool = [];
   for (var i = 0; i < bots.length; i++) if (bots[i].alive) pool.push(bots[i]);
   if (pool.length < 2) return;
@@ -1757,8 +1764,8 @@ function endMatch(won, rank) {
   el.goTitle.textContent = won ? 'BOOYAH!' : 'DEFEATED';
   el.goTitle.className = won ? 'win' : 'lose';
   el.goStats.innerHTML = won
-    ? '#1 / 20 &bull; <b>' + player.kills + '</b> ELIMINATIONS'
-    : '#' + rank + ' / 20 &bull; <b>' + player.kills + '</b> ELIMINATIONS';
+    ? '#1 / ' + (CFG.botCount + 1) + ' &bull; <b>' + player.kills + '</b> ELIMINATIONS'
+    : '#' + rank + ' / ' + (CFG.botCount + 1) + ' &bull; <b>' + player.kills + '</b> ELIMINATIONS';
   el.gameover.classList.remove('hidden');
   el.hud.classList.add('hidden');
   if (document.pointerLockElement === el.canvas) document.exitPointerLock();
@@ -1868,15 +1875,101 @@ function loop() {
   renderer.render(scene, camera);
 }
 
-/* build an ambient world for the menu backdrop */
-buildWorld();
-player.mode = 'menu';
-player.mesh = makeSoldier(0xff8c1a, 0x2f3b4c, 0xe8b98a, 0xff5b1a);
-attachGun(player.mesh, GUN_COLORS.pistol);
-scene.add(player.mesh);
-player.mesh.visible = false;
+/* ---------------- first-run loader ----------------
+   Shows a progress bar that really verifies the game packages
+   (graphics engine, WebGL, audio, storage, game files) on first
+   launch, then re-checks quickly on every later launch. */
+function runLoader(done) {
+  var screen = $('loading'), fill = $('loadfill'), txt = $('loadTxt'),
+      pct = $('loadPct'), sub = $('loadSub');
+  var first = true;
+  try { first = !window.localStorage.getItem('fz_setup_done'); } catch (e) { first = true; }
 
-if (isTouch) bindTouch(); else bindDesktop();
+  if (screen) screen.style.display = 'flex';
+  if (sub) sub.textContent = first ? 'FIRST TIME SETUP — INSTALLING PACKAGES' : 'CHECKING GAME PACKAGES';
+
+  var steps = [];
+  function step(label, weight, fn) { steps.push({ label: label, weight: weight, fn: fn }); }
+
+  step('CHECKING DEVICE', 1, function () {
+    var c = document.createElement('canvas');
+    var gl = c.getContext && (c.getContext('webgl') || c.getContext('experimental-webgl'));
+    if (!gl) throw new Error('WEBGL NOT SUPPORTED');
+  });
+  step('LOADING GRAPHICS ENGINE', 2, function () {
+    if (!window.THREE || !THREE.WebGLRenderer || !THREE.Scene) throw new Error('ENGINE MISSING');
+  });
+  step('VERIFYING GAME FILES', 2, function () {
+    if (typeof makeSoldier !== 'function' || typeof buildWorld !== 'function' ||
+        typeof startMatch !== 'function') throw new Error('GAME FILES CORRUPT');
+    if (!el.canvas) throw new Error('RENDER TARGET MISSING');
+  });
+  step('INSTALLING AUDIO PACKAGES', 1, function () { Sfx.ensure(); });
+  step('CHECKING STORAGE', 1, function () {
+    try { window.localStorage.setItem('fz_probe', '1'); window.localStorage.removeItem('fz_probe'); } catch (e) { /* optional */ }
+  });
+  step('GENERATING ISLAND MAP', 4, null); // real world build happens in boot
+  step('OPTIMIZING FOR DEVICE', 1, function () {
+    var dpr = window.devicePixelRatio || 1;
+    if (dpr > 2.5) renderer.setPixelRatio(2);
+  });
+  step('STARTING GAME', 1, null);
+
+  var total = 0, i;
+  for (i = 0; i < steps.length; i++) total += steps[i].weight;
+  var acc = 0, idx = 0;
+
+  function paint(p, label) {
+    var pc = Math.round(p * 100);
+    if (fill) fill.style.width = pc + '%';
+    if (pct) pct.textContent = pc + '%';
+    if (txt && label) txt.textContent = label;
+  }
+
+  function next() {
+    if (idx >= steps.length) {
+      paint(1, 'ALL CHECKS PASSED — OPENING GAME');
+      try { window.localStorage.setItem('fz_setup_done', '1'); } catch (e) {}
+      setTimeout(function () {
+        if (screen) screen.style.display = 'none';
+        $('menu').classList.remove('hidden');
+        done();
+      }, 420);
+      return;
+    }
+    var s = steps[idx];
+    paint(acc / total, s.label + '…');
+    setTimeout(function () {
+      try {
+        if (s.fn) s.fn();
+      } catch (e) {
+        if (txt) { txt.textContent = 'ERROR: ' + e.message; txt.style.color = '#ff5b5b'; }
+        return;
+      }
+      acc += s.weight;
+      idx++;
+      next();
+    }, first ? 260 : 110);
+  }
+  next();
+}
+
+/* ---------------- boot ---------------- */
+var booted = false;
+function bootGame() {
+  if (booted) return;
+  booted = true;
+  if (player.mode === 'menu') {
+    // ambient island for the menu backdrop
+    buildWorld();
+    player.mesh = makeSoldier(0xff8c1a, 0x2f3b4c, 0xe8b98a, 0xff5b1a);
+    attachGun(player.mesh, GUN_COLORS.pistol);
+    scene.add(player.mesh);
+    player.mesh.visible = false;
+  }
+  if (isTouch) bindTouch(); else bindDesktop();
+  loop();
+}
 
 /* test / debug api */
 window.FZ = {
@@ -1891,8 +1984,11 @@ window.FZ = {
   pause: openPause,
   resume: closePause,
   give: giveWeapon,
+  weapons: WEAPONS,
   fire: function () { input.fire = true; tryFire(0.016); input.fire = false; }
 };
 
-loop();
+player.mode = 'menu';
+runLoader(bootGame);
 })();
+;

@@ -151,6 +151,14 @@ vm.runInContext(fs.readFileSync(path.join(GAME_DIR, 'game.js'), 'utf8'), ctx, { 
 const FZ = sandbox.window.FZ;
 if (!FZ) throw new Error('FZ api missing');
 
+/* The game boots through its first-run loader (real timers), so flush the
+   event loop to let it finish and start the render loop before testing. */
+async function flush(ms) { await new Promise(r => setTimeout(r, ms || 40)); }
+
+(async () => {
+await flush(150);
+assert(typeof rafCb === 'function', 'loader completed, render loop started');
+
 /* ---------- helpers ---------- */
 function frames(n, dtMs = 16.7) {
   for (let i = 0; i < n; i++) {
@@ -172,6 +180,8 @@ assert(FZ.player.mode === 'menu', 'menu mode active, ambient world ticking');
 /* ---------- 2. drop ---------- */
 FZ.start();
 assert(FZ.player.mode === 'drop', 'match started, parachute drop active');
+assert(FZ.bots.length === 29 && FZ.botsAlive() === 29, '29 bots spawned (30 players total)');
+assert(FZ.weapons && FZ.weapons.sniper && FZ.weapons.scar && FZ.weapons.lmg, '7 weapons registered incl. SCAR-L, M249, M24');
 seconds(11);
 assert(FZ.player.mode === 'play', 'landed after ~9s drop, mode=play');
 
@@ -209,6 +219,24 @@ const before = FZ.botsAlive();
 const b0 = FZ.bots.find(b => b.alive);
 assert(shootBot(b0), 'player eliminated a bot (alive ' + before + ' -> ' + FZ.botsAlive() + ', kills=' + FZ.player.kills + ')');
 
+/* sniper one-shot kill check */
+const bS = FZ.bots.find(b => b.alive);
+FZ.give('sniper');
+let sniped = false;
+for (let g = 0; g < 60; g++) {
+  if (!bS.alive) { sniped = true; break; }
+  if (FZ.player.mode !== 'play') break;
+  FZ.player.hp = 100;
+  const ps = FZ.player.pos;
+  ps.x = bS.pos.x + 6; ps.y = 0; ps.z = bS.pos.z;
+  FZ.player.yaw = Math.atan2(bS.pos.x - ps.x, bS.pos.z - ps.z);
+  FZ.player.elev = 0.05;
+  FZ.fire();
+  if (!bS.alive) sniped = true;
+  seconds(0.4);
+}
+assert(sniped, 'M24 sniper one-shot elimination works');
+
 seconds(4);
 console.log('PASS: bot return-fire simulation stable');
 
@@ -230,7 +258,7 @@ FZ.start();
 seconds(11);
 FZ.give('rifle');
 let rounds = 0;
-while (FZ.botsAlive() > 0 && rounds++ < 60) {
+while (FZ.botsAlive() > 0 && rounds++ < 75) {
   if (FZ.player.mode !== 'play') { FZ.start(); seconds(11); FZ.give('rifle'); } // got killed — redeploy
   const bot = FZ.bots.find(b => b.alive);
   if (!bot) break;
@@ -241,10 +269,11 @@ while (FZ.botsAlive() > 0 && rounds++ < 60) {
   shootBot(bot);
   seconds(1.5); // let fake elims / skirmish / zone damage run
 }
-assert(FZ.botsAlive() === 0, 'all 19 bots eliminated in ' + rounds + ' rounds');
+assert(FZ.botsAlive() === 0, 'all ' + FZ.bots.length + ' bots eliminated in ' + rounds + ' rounds');
 
 setTimeout(() => {
   console.log('PASS: endgame reached, mode=' + FZ.player.mode);
   console.log('\nALL SMOKE TESTS PASSED');
   process.exit(0);
 }, 2200);
+})().catch(e => { console.error('TEST CRASH:', e && e.message); process.exit(1); });
