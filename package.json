@@ -1,0 +1,20 @@
+{
+  "name": "gymflow",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-first gym app (APK) with a paid ad-free tier, backed by a self-hosted YOUPI PG UPI gateway",
+  "scripts": {
+    "start": "node backend/server.mjs",
+    "dev": "node --watch backend/server.mjs",
+    "sync": "node scripts/sync-webapp.mjs",
+    "icons": "python3 scripts/make-icons.py",
+    "apk": "bash scripts/build-apk.sh",
+    "toolchain": "bash scripts/setup-toolchain.sh",
+    "license": "node scripts/gen-license.mjs",
+    "test:webhook": "node scripts/test-webhook.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

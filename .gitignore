@@ -1,0 +1,14 @@
+node_modules/
+.env
+backend/.env
+backend/data/*.json
+backend/data/*.tmp
+toolchain/
+release/keystore/*.jks
+release/keystore/*.keystore
+release/*.idsig
+release/*-unaligned.apk
+release/*-aligned.apk
+*.log
+tmp/
+.DS_Store

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gf_background">#FF070A08</color>
+    <color name="gf_accent">#FFA3E635</color>
+
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/gf_background</item>
+        <item name="android:colorBackground">@color/gf_background</item>
+        <item name="android:statusBarColor">@color/gf_background</item>
+        <item name="android:navigationBarColor">@color/gf_background</item>
+        <item name="android:colorAccent">@color/gf_accent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

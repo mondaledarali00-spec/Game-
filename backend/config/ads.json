@@ -1,0 +1,28 @@
+{
+  "ads": [
+    {
+      "id": "ad-protein",
+      "title": "Fuel your gains",
+      "body": "GymFlow Pro members get ad-free training and the full program library.",
+      "cta": "See Pro",
+      "url": "",
+      "weight": 3
+    },
+    {
+      "id": "ad-hydrate",
+      "title": "Hydration check",
+      "body": "2% dehydration can cost you 10% of your strength. Log a glass now.",
+      "cta": "Log water",
+      "url": "",
+      "weight": 2
+    },
+    {
+      "id": "ad-recovery",
+      "title": "Recovery is training",
+      "body": "Sleep 7-9 hours. Muscles are built while you rest, not while you lift.",
+      "cta": "Ok",
+      "url": "",
+      "weight": 2
+    }
+  ]
+}

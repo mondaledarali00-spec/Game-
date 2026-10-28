@@ -1,0 +1,15 @@
+{
+  "name": "gymflow-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GymFlow payment + sync bridge for the self-hosted YOUPI PG UPI gateway",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "genkey": "node ../scripts/gen-license.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

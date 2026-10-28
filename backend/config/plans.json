@@ -1,0 +1,32 @@
+{
+  "currency": "INR",
+  "plans": [
+    {
+      "id": "pro_lifetime",
+      "label": "Pro Lifetime",
+      "amount": "149.00",
+      "period": "one-time",
+      "days": null,
+      "features": [
+        "No ads, ever",
+        "All 4 training programs",
+        "Progress charts + PR tracking",
+        "Cloud backup",
+        "Support a solo dev"
+      ]
+    },
+    {
+      "id": "pro_year",
+      "label": "Pro — 1 Year",
+      "amount": "79.00",
+      "period": "per year",
+      "days": 365,
+      "features": [
+        "No ads, ever",
+        "All training programs",
+        "Progress charts + PR tracking",
+        "Cloud backup"
+      ]
+    }
+  ]
+}
