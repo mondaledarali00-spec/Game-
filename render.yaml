@@ -1,0 +1,30 @@
+# Render blueprint — https://render.com/docs/blueprint-spec
+# New → Blueprint → pick this repo. Then fill the env vars marked sync: false.
+services:
+  - type: web
+    name: gymflow-bridge
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: MERCHANT_UPI_ID
+        value: 8089274532@axl
+      - key: MERCHANT_NAME
+        value: GymFlow
+      - key: MERCHANT_MCC
+        value: "7994"
+      - key: PAYMENT_PROVIDER
+        value: youpi
+      - key: GRANT_ON
+        value: observed
+      - key: ADMIN_TOKEN
+        sync: false          # paste a long random hex in the dashboard
+      - key: YOUPI_MERCHANT_ID
+        sync: false
+      - key: YOUPI_MERCHANT_SECRET
+        sync: false
+      - key: YOUPI_API_URL
+        sync: false          # e.g. https://your-youpi.onrender.com:6100 style URL
+      - key: PUBLIC_BASE_URL
+        sync: false          # https://gymflow-bridge.onrender.com

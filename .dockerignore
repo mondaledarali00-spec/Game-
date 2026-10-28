@@ -1,0 +1,9 @@
+.git
+node_modules
+release
+android
+toolchain
+tmp
+*.log
+backend/data
+backend/.env

@@ -7,7 +7,7 @@ self-hosted **YOUPI PG** UPI gateway ([youpi-pg/YouPI-PG](https://github.com/you
 
 | | |
 |---|---|
-| **APK** | [`release/GymFlow-1.1.0.apk`](release/GymFlow-1.1.0.apk) — signed (v1+v2+v3), 84 KB |
+| **APK** | [`release/GymFlow-1.1.1.apk`](release/GymFlow-1.1.1.apk) — signed (v1+v2+v3), 84 KB |
 | **Payments** | money → `8089274532@axl` via a self-drawn UPI QR; verified automatically or with one tap ([docs/PAYMENTS.md](docs/PAYMENTS.md)) |
 | **Package** | `com.gymflow.app` · minSdk 21 (Android 5.0+) · targetSdk 34 |
 | **Web app** | `webapp/` — plain HTML/CSS/JS, no build step, bundled inside the APK |
@@ -32,7 +32,7 @@ self-hosted **YOUPI PG** UPI gateway ([youpi-pg/YouPI-PG](https://github.com/you
 - Cloud backup / restore of your training log to your own server
 - Remote ad inventory (falls back to the built-in ad cards when offline)
 
-**Payments (v1.1.0)**
+**Payments (v1.1.1)**
 - Tapping a plan opens a **UPI payment sheet**: a QR code drawn on the device
   (no internet needed), deep links for GPay / PhonePe / Paytm, the merchant UPI ID
   with copy, and a 12-digit UTR field
@@ -64,9 +64,21 @@ Open <http://localhost:8787>, sign up, start a workout, then go to **Pro → Pro
 
 ---
 
-## 3. Connect the real payment gateway (YOUPI PG)
+## 3. Host it and take real money to your own UPI ID
 
-Full walkthrough: **[docs/SETUP_YOUPI.md](docs/SETUP_YOUPI.md)**. Short version:
+**Start here:** **[docs/HOSTING.md](docs/HOSTING.md)** — the complete, copy-paste
+setup: pick a host (VPS / Render / PC + tunnel), fill `backend/.env`, run YouPI PG,
+pair the bank-SMS observer, point the app at your URL, then prove it with
+`node scripts/check-deploy.mjs https://your-server --token=… --secret=…` (21 checks).
+
+Two days-one facts:
+- The receiving UPI ID is **`8089274532@axl`** — money lands in that bank account, 0% fee.
+- Without YouPI's observer you can still sell: every UTR shows up on
+  `https://your-server/admin?token=…` and one tap approves it.
+
+Docker users: `docker compose up -d --build` (or `render.yaml` for a Render blueprint).
+
+YouPI-specific wiring: **[docs/SETUP_YOUPI.md](docs/SETUP_YOUPI.md)**. Short version:
 
 ```bash
 # 1. run the gateway (their repo, Node 22+)
@@ -112,7 +124,7 @@ with a constant-time compare, exactly as documented in their `openapi.yaml`.
 ```bash
 bash scripts/setup-toolchain.sh          # downloads JDK-less fallback + apktool/apksigner jars
 export JAVA_HOME=... APKTOOL_JAR=... APKSIGNER_JAR=...
-bash scripts/build-apk.sh                # -> release/GymFlow-1.1.0.apk
+bash scripts/build-apk.sh                # -> release/GymFlow-1.1.1.apk
 ```
 
 Details, signing keys and versioning: **[docs/BUILD_APK.md](docs/BUILD_APK.md)**.
@@ -126,7 +138,7 @@ Otherwise the app starts fully offline and the URL can be pasted in
 **More → Cloud & payments server** (saved per device, no rebuild needed).
 
 ### Install on the phone
-1. Copy `release/GymFlow-1.1.0.apk` to the phone (Drive / USB / `adb install -r`).
+1. Copy `release/GymFlow-1.1.1.apk` to the phone (Drive / USB / `adb install -r`).
 2. Open it → Android asks to allow "install unknown apps" for that app → allow.
 3. GymFlow appears in the launcher. No Google Play, no account, no permissions
    beyond internet + vibration.
@@ -185,11 +197,15 @@ scripts/
   make-icons.py         generates every launcher density from one design
   gen-license.mjs       issue Pro keys
   test-webhook.mjs      end-to-end signed-webhook test
+  check-deploy.mjs      proves a HOSTED server works end to end (21 checks)
+  test-upi.mjs          direct-UPI + webhook + admin lane tests
 docs/
+  HOSTING.md            host the bridge, run YouPI, pair the observer, go live
   SETUP_YOUPI.md        gateway setup, merchant webhook, going public
+  PAYMENTS.md           how a rupee travels and how it is proven
   BUILD_APK.md          toolchain, signing, releasing updates
 release/
-  GymFlow-1.1.0.apk     the signed APK
+  GymFlow-1.1.1.apk     the signed APK
   keystore/             your release key — back it up, never commit the password
 ```
 
@@ -201,7 +217,7 @@ ADMIN_TOKEN=admin123 YOUPI_MERCHANT_SECRET=devsecret \
   node scripts/test-upi.mjs                          # direct UPI, both lanes
 YOUPI_MERCHANT_SECRET=devsecret node scripts/test-webhook.mjs   # YOUPI webhook contract
 node scripts/test-qr.mjs /tmp/qrcheck && python3 scripts/test-qr-verify.py /tmp/qrcheck
-python3 scripts/verify_apk.py release/GymFlow-1.1.0.apk
+python3 scripts/verify_apk.py release/GymFlow-1.1.1.apk
 ```
 
 The UI was validated headlessly (signup → onboarding → workout → Pro unlock →
@@ -233,7 +249,7 @@ The 1.0.1 build is hardened against the two things that normally cause that:
 Every build is also machine-checked before it ships:
 
 ```bash
-python3 scripts/verify_apk.py release/GymFlow-1.1.0.apk
+python3 scripts/verify_apk.py release/GymFlow-1.1.1.apk
 #  package / launcher activity / label / icon / dex classes / native shell methods
 #  bundled assets / resources.arsc alignment / v2+v3 signature
 ```

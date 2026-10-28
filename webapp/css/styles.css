@@ -435,3 +435,16 @@ code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 5px;
 .upi-app-icon { font-size: 18px; line-height: 1; }
 .upi-app-label { font-size: 11px; font-weight: 700; text-align: center; }
 .upi-app:first-child .upi-app-label { font-size: 14px; }
+
+/* ---------- merchant / UPI receiving account ---------- */
+.merchant-card { border-color: rgba(163, 230, 53, 0.28); }
+.merchant-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.chip-ok { background: rgba(163, 230, 53, 0.16); border-color: rgba(163, 230, 53, 0.45); color: var(--accent); font-weight: 700; }
+.chip-warn { background: rgba(255, 196, 0, 0.14); border-color: rgba(255, 196, 0, 0.4); color: #ffc400; font-weight: 700; }
+.setup-check { list-style: none; padding: 0; margin: 4px 0 0; }
+.setup-check li { padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+.setup-check li:last-child { border-bottom: 0; }
+.setup-check li.ok { color: var(--accent); }
+.setup-check li.err { color: #ff7a7a; }
+.setup-check li .tiny { font-weight: 400; }
+.setup-check li.warn { color: #ffc400; }

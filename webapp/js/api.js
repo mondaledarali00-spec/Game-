@@ -67,6 +67,7 @@
     ads: function () { return request('/api/ads', {}, 6000); },
 
     /* -------- direct-to-VPA UPI (money goes to merchant.upiId) -------- */
+    upiConfig: function () { return request('/api/upi/config', {}, 6000); },
     createUpiOrder: function (planId, extra) {
       var body = {
         planId: planId,

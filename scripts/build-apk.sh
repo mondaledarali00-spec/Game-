@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 APP_NAME="GymFlow"
-VERSION="1.1.0"
+VERSION="1.1.1"
 OUT_DIR="$ROOT/release"
 KEYSTORE_DIR="$ROOT/release/keystore"
 KEYSTORE="$KEYSTORE_DIR/gymflow-release.jks"

@@ -150,3 +150,5 @@ Regenerate the sample PNG in `docs/assets/upi-qr-149.png` with
   charging the public at scale.
 - A personal VPA receiving business payments can attract your bank's scrutiny.
   A current account with a merchant VPA is the safer long-term setup.
+
+> Hosting and going live: [`HOSTING.md`](HOSTING.md).

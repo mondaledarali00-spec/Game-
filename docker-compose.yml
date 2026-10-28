@@ -1,0 +1,19 @@
+# One command:  docker compose up -d
+# Put your secrets in backend/.env first (copy backend/.env.example).
+services:
+  bridge:
+    build: .
+    container_name: gymflow-bridge
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    environment:
+      PORT: "8787"
+      DATA_DIR: /data
+    ports:
+      - "8787:8787"
+    volumes:
+      - gymflow-data:/data
+
+volumes:
+  gymflow-data:

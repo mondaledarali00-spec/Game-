@@ -698,6 +698,29 @@
   /* ------------------------------------------------------------------ */
   /* PRO / PAYMENTS                                                      */
   /* ------------------------------------------------------------------ */
+  /* The money destination, always visible on the Pro tab. */
+  function merchantCardHTML(configured) {
+    var m = Pay.merchant();
+    return '<section class="card merchant-card">' +
+      '  <div class="merchant-top">' +
+      '    <span class="tiny muted">Money goes to this UPI ID</span>' +
+      '    <span class="chip ' + (configured ? 'chip-ok' : 'chip-warn') + '">' +
+      (configured ? 'auto-verify ON' : 'auto-verify OFF') + '</span>' +
+      '  </div>' +
+      '  <div class="upi-id-row">' +
+      '    <div><div class="upi-id">' + esc(m.upiId) + '</div>' +
+      '    <p class="tiny muted" style="margin:4px 0 0">Payee name in the UPI app: <strong>' + esc(m.payeeName) + '</strong></p></div>' +
+      '    <button class="btn btn-ghost btn-sm" data-action="copy-upi" data-upi="' + esc(m.upiId) + '">Copy</button>' +
+      '  </div>' +
+      (configured
+        ? '<p class="tiny muted" style="margin:8px 0 0">Confirmed automatically by <strong>' + esc(Api.apiBase()) + '</strong>. ' +
+          '<button class="link" data-action="check-setup">Test my setup</button></p>'
+        : '<p class="tiny muted" style="margin:8px 0 0">No server linked yet, so a payment cannot confirm itself. ' +
+          '<button class="link" data-action="check-setup">Test my setup</button> · ' +
+          '<button class="link" data-action="sheet-gateway">Show the 3 steps</button></p>') +
+      '</section>';
+  }
+
   function viewPro(d) {
     var pro = Store.isPro();
     var plans = Pay.plans();
@@ -724,6 +747,8 @@
     return '' +
       '<header class="topbar"><div><p class="tiny muted">Support the app</p><h1 class="h1">Go Pro</h1></div></header>' +
 
+      merchantCardHTML(configured) +
+
       '<section class="card card-pro">' +
       '  <div class="pro-badge">PRO</div>' +
       '  <h2 class="h2">Train without ads</h2>' +
@@ -742,9 +767,9 @@
       }).join('') +
 
       '<section class="card">' +
-      '  <h3 class="h3">Pay directly to UPI</h3>' +
-      '  <p class="body-text">Every payment goes straight to <strong>' + esc(Pay.merchant().upiId) + '</strong> — ' +
-      'the merchant\'s own bank account. No card, no aggregator, no 2% cut.</p>' +
+      '  <h3 class="h3">Direct UPI — 0% fee</h3>' +
+      '  <p class="body-text">No card, no aggregator, no 2% cut. Money lands in the receiving account above. ' +
+      'The app never sees your UPI PIN, and nothing is charged until you approve it in your UPI app.</p>' +
       (pending ? '<button class="btn btn-primary btn-block" data-action="resume-payment">Continue my pending payment</button>' : '') +
       '</section>' +
 
@@ -908,33 +933,95 @@
     }).join('') + '</ul>';
   }
 
+  /* In-app version of docs/HOSTING.md — three steps, plain language. */
   function sheetGateway() {
     var configured = Api.isConfigured();
+    var m = Pay.merchant();
     openSheet(
-      '<div class="sheet-head"><h3 class="h3">Connect your UPI payment gateway</h3>' +
-      '<button class="icon-btn" data-action="close-sheet">✕</button></div>' +
-      '<p class="body-text">GymFlow collects Pro payments through <strong>YouPI PG</strong>, a self-hosted UPI gateway. ' +
-      'Money goes straight to your bank account — 0% platform fee. Three steps:</p>' +
+      '<div class="sheet-head"><h3 class="h3">Make UPI work</h3>' +
+      '<button class="icon-btn" data-action="close-sheet">\u2715</button></div>' +
+
+      merchantCardHTML(configured) +
+
+      '<p class="body-text" style="margin-top:10px">Money is collected straight into the UPI ID above with a QR code drawn on the phone. ' +
+      'But a phone cannot see your bank account \u2014 so one small server has to sit in between and confirm each credit. Three steps:</p>' +
+
       '<ol class="steps">' +
-      '  <li><strong>Run YouPI PG</strong> on a server or PC and create a merchant. ' +
-      '     Put your UPI ID (VPA, e.g. <code>name@okhdfcbank</code>) in the merchant settings there — ' +
-      '     the UPI ID lives in the gateway, never in this app.</li>' +
-      '  <li><strong>Set the webhook</strong> in the YouPI merchant admin to ' +
-      '     <code>&lt;your-server&gt;/api/youpi/webhook</code>.</li>' +
-      '  <li><strong>Paste your GymFlow server URL</strong> below (the bridge that talks to YouPI).</li>' +
+      '  <li><strong>Host the bridge</strong> \u2014 one Node command on a VPS, Render or Railway. ' +
+      'Full copy-paste guide: <code>docs/HOSTING.md</code> in the repo.</li>' +
+      '  <li><strong>Run YouPI PG</strong> next to it and create a merchant whose receiving VPA is ' +
+      '     <strong>' + esc(m.upiId) + '</strong>. Copy the <em>merchant id</em> and <em>webhook secret</em> into the bridge\u2019s <code>.env</code>.</li>' +
+      '  <li><strong>Pair the observer</strong> (YouPI\u2019s Android app on the phone that receives the bank SMS, or the Gmail observer) ' +
+      '     and set the webhook to <code>https://your-server/api/youpi/webhook</code>. Now every credit is matched by UTR automatically.</li>' +
       '</ol>' +
+
       '<label class="field" style="margin-top:12px"><span>Your GymFlow server URL</span>' +
       '<input id="gateway-url" type="url" autocapitalize="off" placeholder="https://gym.mydomain.com" value="' + esc(Api.apiBase()) + '"></label>' +
       '<div class="row-2">' +
       '  <button class="btn btn-ghost" data-action="gateway-save">Save &amp; test</button>' +
-      '  <button class="btn btn-primary" data-action="gateway-docs">Watch how-to</button>' +
+      '  <button class="btn btn-primary" data-action="check-setup">Test my setup</button>' +
       '</div>' +
       '<div id="gateway-status" class="tiny muted" style="margin-top:10px">' +
-      (configured ? 'Currently connected to ' + esc(Api.apiBase()) : 'No server configured yet — the app runs in offline mode.') +
+      (configured ? 'Currently connected to ' + esc(Api.apiBase()) : 'No server configured yet \u2014 payments show a QR but cannot confirm by themselves.') +
       '</div>' +
-      '<p class="tiny muted" style="margin-top:14px">No server? You can still sell Pro with ' +
-      '<button class="link" data-action="sheet-redeem">licence keys</button> — they work with zero internet.</p>'
+      '<p class="tiny muted" style="margin-top:14px">YouPI how-to videos: ' +
+      '<button class="link" data-action="gateway-docs">open the YouTube walkthrough</button>.<br>' +
+      'No server at all? You can still sell Pro with ' +
+      '<button class="link" data-action="sheet-redeem">licence keys</button> \u2014 they work with zero internet.</p>'
     );
+  }
+
+  /* End-to-end self check of the hosted setup, answered by the server itself. */
+  function checkSetup() {
+    var typed = ((document.getElementById('gateway-url') || {}).value ||
+                 (document.getElementById('set-server') || {}).value || '').trim();
+    if (typed) Api.setApiBase(typed);
+    if (!Api.isConfigured()) {
+      openSheet('<div class="sheet-head"><h3 class="h3">Setup check</h3>' +
+        '<button class="icon-btn" data-action="close-sheet">\u2715</button></div>' +
+        '<p class="body-text">No server URL saved yet. Host the bridge first (see <code>docs/HOSTING.md</code>), ' +
+        'then paste its https URL on this screen.</p>' +
+        '<button class="btn btn-primary btn-block" data-action="sheet-gateway">Enter server URL</button>');
+      return;
+    }
+    openSheet('<div class="sheet-head"><h3 class="h3">Setup check</h3>' +
+      '<button class="icon-btn" data-action="close-sheet">\u2715</button></div>' +
+      '<p class="body-text">Asking <strong>' + esc(Api.apiBase()) + '</strong> how it is configured\u2026</p>' +
+      '<div class="spinner"></div>');
+
+    var mine = Pay.merchant().upiId;
+    Promise.all([
+      Api.health().catch(function (e) { return { __error: e.message }; }),
+      Api.upiConfig().catch(function (e) { return { __error: e.message }; })
+    ]).then(function (r) {
+      var health = r[0] || {}, uconf = r[1] || {};
+      var online = !health.__error;
+      var serverUpi = uconf.upiId || health.merchantUpiId || '';
+      var match = serverUpi && serverUpi.toLowerCase() === mine.toLowerCase();
+      var real = (health.provider || '') !== 'mock';
+      // true = green tick, null = amber warning (works, but not ideal), false = red cross
+      var row = function (good, label, note) {
+        var cls = good === null ? 'warn' : (good ? 'ok' : 'err');
+        var mark = good === null ? '!' : (good ? '\u2713' : '\u2717');
+        return '<li class="' + cls + '">' + mark + ' ' +
+          esc(label) + (note ? '<br><span class="tiny muted">' + esc(note) + '</span>' : '') + '</li>';
+      };
+      openSheet(
+        '<div class="sheet-head"><h3 class="h3">Setup check</h3>' +
+        '<button class="icon-btn" data-action="close-sheet">\u2715</button></div>' +
+        '<ul class="setup-check">' +
+        row(online, 'Server reachable', online ? Api.apiBase() : health.__error) +
+        row(match, 'Receiving UPI matches', 'server: ' + (serverUpi || '\u2014') + ' \u00b7 app: ' + mine) +
+        row(real ? true : null, 'Real UPI gateway wired', real ? 'provider: ' + health.provider : 'provider is "mock" \u2014 no real money moves yet; you can still approve payments by hand on /admin (set PAYMENT_PROVIDER=youpi for automatic)') +
+        row(!!health.webhookReady, 'Webhook secret accepted', health.webhookReady ? 'a bank credit will unlock Pro automatically' : 'YOUPI_MERCHANT_SECRET is missing') +
+        row(!!uconf.manualApproval, 'Admin approve page available', health.adminConsole ? '/admin?token=\u2026' : 'set ADMIN_TOKEN')
+        + '</ul>' +
+        '<p class="tiny muted" style="margin-top:10px">Fix anything marked \u2717 in <code>docs/HOSTING.md</code> \u2192 Troubleshooting, ' +
+        'or run <code>node scripts/check-deploy.mjs ' + esc(Api.apiBase()) + '</code> on the server for a machine-readable report.</p>' +
+        '<div class="row-2"><button class="btn btn-ghost" data-action="check-setup">Re-run</button>' +
+        '<button class="btn btn-primary" data-action="close-sheet">Done</button></div>'
+      );
+    });
   }
 
   function sheetRedeem() {
@@ -1111,6 +1198,7 @@
       case 'sheet-redeem': sheetRedeem(); break;
       case 'sheet-gateway': sheetGateway(); break;
       case 'gateway-save': gatewaySave(); break;
+      case 'check-setup': checkSetup(); break;
       case 'gateway-docs':
         Pay.openExternal('https://www.youtube.com/results?search_query=YouPI+PG+UPI+payment+gateway+setup');
         break;
