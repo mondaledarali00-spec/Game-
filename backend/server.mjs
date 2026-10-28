@@ -382,6 +382,7 @@ const server = http.createServer(async (req, res) => {
         provider: config.provider,
         gateway: config.provider === 'youpi' ? 'YOUPI PG' : 'mock',
         gatewayConfigured: config.provider === 'youpi' ? youpi.configured : true,
+        webhookReady: Boolean(config.youpi.merchantSecret),
         youpiApiUrl: config.provider === 'youpi' ? config.youpi.apiUrl : null,
         grantOn: config.grantOn,
         time: new Date().toISOString()

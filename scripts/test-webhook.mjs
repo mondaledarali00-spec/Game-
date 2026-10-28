@@ -11,7 +11,7 @@ const post = (path, body, headers = {}) =>
     .then(async (r) => ({ status: r.status, body: await r.json() }));
 
 const health = await fetch(base + '/api/health').then((r) => r.json());
-if (!health.gatewayConfigured) {
+if (!health.webhookReady) {
   console.log('NOTE: this server has no YOUPI merchant secret configured, so webhooks');
   console.log('      cannot be verified. Start it with YOUPI_MERCHANT_SECRET=testsecret123');
   console.log('      (and the same value in this script\'s env) to run the full check.\n');
