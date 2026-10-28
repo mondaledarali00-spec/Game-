@@ -7,7 +7,8 @@ self-hosted **YOUPI PG** UPI gateway ([youpi-pg/YouPI-PG](https://github.com/you
 
 | | |
 |---|---|
-| **APK** | [`release/GymFlow-1.0.1.apk`](release/GymFlow-1.0.1.apk) — signed (v1+v2+v3), 76 KB |
+| **APK** | [`release/GymFlow-1.1.0.apk`](release/GymFlow-1.1.0.apk) — signed (v1+v2+v3), 84 KB |
+| **Payments** | money → `8089274532@axl` via a self-drawn UPI QR; verified automatically or with one tap ([docs/PAYMENTS.md](docs/PAYMENTS.md)) |
 | **Package** | `com.gymflow.app` · minSdk 21 (Android 5.0+) · targetSdk 34 |
 | **Web app** | `webapp/` — plain HTML/CSS/JS, no build step, bundled inside the APK |
 | **Backend** | `backend/server.mjs` — Node 20+, zero dependencies, merchant bridge to YOUPI PG |
@@ -30,6 +31,15 @@ self-hosted **YOUPI PG** UPI gateway ([youpi-pg/YouPI-PG](https://github.com/you
 - Pro licence keys (server-side or fully offline)
 - Cloud backup / restore of your training log to your own server
 - Remote ad inventory (falls back to the built-in ad cards when offline)
+
+**Payments (v1.1.0)**
+- Tapping a plan opens a **UPI payment sheet**: a QR code drawn on the device
+  (no internet needed), deep links for GPay / PhonePe / Paytm, the merchant UPI ID
+  with copy, and a 12-digit UTR field
+- Money goes **straight to the merchant's own VPA** — no aggregator, 0% cut
+- Verification: automatically from a YouPI PG bank-credit webhook (matched by UTR,
+  then by exact amount), or one tap in `/admin` when no observer is running
+- The phone polls every 5 s and unlocks Pro the moment the credit is confirmed
 
 **The ad-free business model**
 - Free tier: one "Sponsored" card on Home and Progress + a **Remove ads** button
@@ -102,7 +112,7 @@ with a constant-time compare, exactly as documented in their `openapi.yaml`.
 ```bash
 bash scripts/setup-toolchain.sh          # downloads JDK-less fallback + apktool/apksigner jars
 export JAVA_HOME=... APKTOOL_JAR=... APKSIGNER_JAR=...
-bash scripts/build-apk.sh                # -> release/GymFlow-1.0.1.apk
+bash scripts/build-apk.sh                # -> release/GymFlow-1.1.0.apk
 ```
 
 Details, signing keys and versioning: **[docs/BUILD_APK.md](docs/BUILD_APK.md)**.
@@ -116,7 +126,7 @@ Otherwise the app starts fully offline and the URL can be pasted in
 **More → Cloud & payments server** (saved per device, no rebuild needed).
 
 ### Install on the phone
-1. Copy `release/GymFlow-1.0.1.apk` to the phone (Drive / USB / `adb install -r`).
+1. Copy `release/GymFlow-1.1.0.apk` to the phone (Drive / USB / `adb install -r`).
 2. Open it → Android asks to allow "install unknown apps" for that app → allow.
 3. GymFlow appears in the launcher. No Google Play, no account, no permissions
    beyond internet + vibration.
@@ -160,6 +170,7 @@ backend/
   lib/youpi.mjs         YOUPI PG client + HMAC webhook verification
   lib/store.mjs         JSON persistence (orders, entitlements, sync)
   lib/license.mjs       licence key sign/verify
+  lib/upi.mjs           direct-to-VPA orders, UPI intent URIs, credit matching
   config/*.json         plans + ads
 android/
   AndroidManifest.xml   package com.gymflow.app
@@ -178,22 +189,37 @@ docs/
   SETUP_YOUPI.md        gateway setup, merchant webhook, going public
   BUILD_APK.md          toolchain, signing, releasing updates
 release/
-  GymFlow-1.0.1.apk     the signed APK
+  GymFlow-1.1.0.apk     the signed APK
   keystore/             your release key — back it up, never commit the password
 ```
 
 ## 7. Tests
 
 ```bash
-node scripts/test-webhook.mjs http://localhost:8787   # signature + entitlement flow
-node backend/server.mjs &                             # then poke the API
-curl localhost:8787/api/health
+node backend/server.mjs &                             # start the bridge
+ADMIN_TOKEN=admin123 YOUPI_MERCHANT_SECRET=devsecret \
+  node scripts/test-upi.mjs                          # direct UPI, both lanes
+YOUPI_MERCHANT_SECRET=devsecret node scripts/test-webhook.mjs   # YOUPI webhook contract
+node scripts/test-qr.mjs /tmp/qrcheck && python3 scripts/test-qr-verify.py /tmp/qrcheck
+python3 scripts/verify_apk.py release/GymFlow-1.1.0.apk
 ```
 
 The UI was validated headlessly (signup → onboarding → workout → Pro unlock →
 re-login persistence) before packaging.
 
-## 8. If the app says "keeps stopping"
+## 8. Payments: where the money and the proof come from
+
+See **[docs/PAYMENTS.md](docs/PAYMENTS.md)** for the full picture. Short version:
+
+| Step | What happens |
+|---|---|
+| Customer taps a plan | app builds `upi://pay?pa=8089274532@axl&am=149.00&tr=<unique>` and draws it as a QR |
+| Customer pays | any UPI app; money lands in your bank account |
+| Verification | YouPI PG bank-alert webhook → `matchCredit()` (UTR, then amount) → Pro granted |
+| No observer yet? | customer's UTR appears in `/admin?token=...`; you tap Approve |
+| Customer's phone | polls `/api/upi/status` every 5 s, unlocks Pro, ads vanish |
+
+## 9. If the app says "keeps stopping"
 
 The 1.0.1 build is hardened against the two things that normally cause that:
 
@@ -207,7 +233,7 @@ The 1.0.1 build is hardened against the two things that normally cause that:
 Every build is also machine-checked before it ships:
 
 ```bash
-python3 scripts/verify_apk.py release/GymFlow-1.0.1.apk
+python3 scripts/verify_apk.py release/GymFlow-1.1.0.apk
 #  package / launcher activity / label / icon / dex classes / native shell methods
 #  bundled assets / resources.arsc alignment / v2+v3 signature
 ```
@@ -219,7 +245,7 @@ Install checklist:
 - If MIUI/HyperOS still kills it: Settings → Apps → GymFlow → Battery → **No restrictions**,
   and make sure **Android System WebView** is updated/enabled in the Play Store.
 
-## 9. Honest limitations
+## 10. Honest limitations
 
 - The UI layer is a WebView app, not native Compose/Flutter: fast and tiny (76 KB),
   but no native gestures/widgets. The native shell only hosts the web app.

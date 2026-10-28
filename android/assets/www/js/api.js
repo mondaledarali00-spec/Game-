@@ -66,6 +66,25 @@
     config: function () { return request('/api/config', {}, 6000); },
     ads: function () { return request('/api/ads', {}, 6000); },
 
+    /* -------- direct-to-VPA UPI (money goes to merchant.upiId) -------- */
+    createUpiOrder: function (planId, extra) {
+      var body = {
+        planId: planId,
+        deviceId: GymHash.deviceId(),
+        user: (Store.user() || {}).display || null
+      };
+      if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
+      return request('/api/upi/order', { method: 'POST', body: body });
+    },
+    submitUtr: function (ref, utr) {
+      return request('/api/upi/utr', { method: 'POST', body: { ref: ref, utr: utr } });
+    },
+    upiStatus: function (ref) {
+      var q = '/api/upi/status?ref=' + encodeURIComponent(ref) +
+        '&deviceId=' + encodeURIComponent(GymHash.deviceId());
+      return request(q, {}, 8000);
+    },
+
     createCheckout: function (planId, extra) {
       var body = {
         planId: planId,

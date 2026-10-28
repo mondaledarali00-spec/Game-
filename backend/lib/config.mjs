@@ -51,6 +51,16 @@ export const config = {
     returnUrl: env('YOUPI_RETURN_URL', '')
   },
   licenseSecret: env('LICENSE_SECRET', 'change-me-gymflow-license-secret'),
+  // Direct-to-VPA collection (customer pays the merchant's UPI ID itself).
+  upi: {
+    upiId: env('MERCHANT_UPI_ID', '8089274532@axl'),
+    payeeName: env('MERCHANT_NAME', 'GymFlow'),
+    merchantCode: env('MERCHANT_MCC', '7994')
+  },
+  // Token for the small /admin order console (approve manual UTRs).
+  adminToken: env('ADMIN_TOKEN', ''),
+  // How long a direct-UPI order stays open before it is marked expired.
+  upiOrderTtlMs: Number(env('UPI_ORDER_TTL_MINUTES', '180')) * 60 * 1000,
   // "observed" unlocks as soon as the bank alert is matched by YOUPI's observers.
   // "reconciled" waits for the merchant to import a bank statement (strict).
   grantOn: env('GRANT_ON', 'observed').toLowerCase(),

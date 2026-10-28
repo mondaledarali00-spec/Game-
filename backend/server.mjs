@@ -19,6 +19,7 @@ import { config, plans, planById, readJSON, BACKEND_DIR } from './lib/config.mjs
 import { orders, entitlements, syncs } from './lib/store.mjs';
 import { YoupiClient, mockProvider } from './lib/youpi.mjs';
 import { makeLicense, verifyLicense } from './lib/license.mjs';
+import { buildUpiUri, newRef, normaliseUtr, matchCredit, merchantUpi, toPaise } from './lib/upi.mjs';
 
 const youpi = new YoupiClient();
 const adsConfig = readJSON(path.join(BACKEND_DIR, 'config', 'ads.json'), { ads: [] });
@@ -201,7 +202,21 @@ async function handleYoupiWebhook(req, res) {
     return fail(res, 400, 'Invalid webhook: ' + err.message);
   }
 
-  const order = orders.findByPayment(event.paymentId) || orders.get(event.orderId);
+  let order = orders.findByPayment(event.paymentId) || orders.get(event.orderId);
+  if (!order && event.metadata && event.metadata.ref) order = orders.get(String(event.metadata.ref));
+  if (!order && ['OBSERVED_SUCCESS', 'RECONCILED', 'SUCCESS'].includes(event.event)) {
+    // A credit arrived that belongs to a direct-to-VPA order: match by UTR, then
+    // by exact amount. This is what makes payment confirmation automatic.
+    const matched = matchCredit(orders.list(), {
+      utr: event.utr || null,
+      amountPaise: event.amountPaise || null,
+      at: Date.now()
+    });
+    if (matched) {
+      order = matched;
+      console.log(`[webhook] matched direct-UPI order ${order.orderId} by ${event.utr ? 'UTR ' + event.utr : 'amount'}`);
+    }
+  }
   if (!order) {
     console.warn('[webhook] unknown order/payment', event.orderId, event.paymentId);
     return ok(res, { received: true, ignored: 'unknown-order' });
@@ -220,9 +235,9 @@ async function handleYoupiWebhook(req, res) {
 
   if (moneySeen) {
     if (reconciled || event.event === 'SUCCESS') {
-      grantPro(order, { source: reconciled ? 'gateway-reconciled' : 'gateway-observed', status: 'paid', grant });
+      grantPro(order, { source: order.flow === 'direct-upi' ? 'upi-auto-verified' : (reconciled ? 'gateway-reconciled' : 'gateway-observed'), status: 'paid', grant });
     } else if (config.grantOn === 'observed') {
-      grantPro(order, { source: 'gateway-observed', status: 'observed_pending_reconciliation', grant });
+      grantPro(order, { source: order.flow === 'direct-upi' ? 'upi-auto-verified' : 'gateway-observed', status: 'observed_pending_reconciliation', grant });
     } else {
       orders.update(order.orderId, { status: 'observed_pending_reconciliation', observedAt: Date.now(), grant });
     }
@@ -306,6 +321,231 @@ async function handleMockPay(res, orderId) {
   return ok(res, { orderId, status: 'paid', mock: true });
 }
 
+
+/* ------------------------------------------------------------------ */
+/* direct-to-VPA UPI collection                                        */
+/* ------------------------------------------------------------------ */
+function adminTokenFrom(req, reqUrl) {
+  return req.headers['x-admin-token'] || reqUrl.searchParams.get('token') || '';
+}
+function isAdmin(req, reqUrl) {
+  if (!config.adminToken) return false;
+  const given = String(adminTokenFrom(req, reqUrl));
+  const a = Buffer.from(given);
+  const b = Buffer.from(config.adminToken);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+async function handleUpiOrder(req, res) {
+  const body = await readJson(req);
+  const plan = planById(body.planId);
+  if (!plan) return fail(res, 400, 'Unknown planId');
+  const deviceId = String(body.deviceId || '').slice(0, 80);
+  if (!deviceId) return fail(res, 400, 'deviceId is required');
+
+  const existing = entitlements.get(deviceId);
+  if (existing && existing.pro && (!existing.expires || existing.expires > Date.now())) {
+    return ok(res, { alreadyPro: true, plan: existing.plan });
+  }
+
+  const ref = newRef(plan.id);
+  const note = `GymFlow ${plan.label} ${ref}`;
+  const order = {
+    orderId: ref,
+    ref,
+    flow: 'direct-upi',
+    planId: plan.id,
+    amount: plan.amount,
+    currency: 'INR',
+    deviceId,
+    user: body.user || null,
+    status: 'awaiting_payment',
+    upiId: merchantUpi.upiId,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + config.upiOrderTtlMs
+  };
+  orders.create(order);
+  console.log(`[upi] order ${ref} ₹${plan.amount} device=${deviceId}`);
+
+  return send(res, 201, {
+    ok: true,
+    ref,
+    orderId: ref,
+    planId: plan.id,
+    amount: plan.amount,
+    currency: 'INR',
+    upiId: merchantUpi.upiId,
+    payeeName: merchantUpi.payeeName,
+    note,
+    upiUri: buildUpiUri({ amount: plan.amount, note, ref }),
+    expiresAt: order.expiresAt,
+    status: order.status
+  });
+}
+
+async function handleUpiUtr(req, res) {
+  const body = await readJson(req);
+  const ref = String(body.ref || '').slice(0, 64);
+  const utr = normaliseUtr(body.utr);
+  if (!ref) return fail(res, 400, 'ref is required');
+  if (!utr) return fail(res, 400, 'That is not a 12-digit UPI reference number (UTR).');
+
+  const order = orders.get(ref);
+  if (!order) return fail(res, 404, 'Unknown order reference');
+  if (order.status === 'paid') return ok(res, { status: 'paid', pro: true });
+
+  orders.update(ref, { utr, utrSubmittedAt: Date.now(), status: 'awaiting_confirmation' });
+  console.log(`[upi] UTR submitted ${ref} utr=${utr}`);
+
+  // If the merchant already confirmed this UTR by hand, or an auto-match landed
+  // while the customer was typing, the entitlement is already there.
+  const ent = entitlements.get(order.deviceId);
+  if (ent && ent.pro && (!ent.expires || ent.expires > Date.now())) {
+    return ok(res, { status: 'paid', pro: true });
+  }
+  return ok(res, {
+    status: 'awaiting_confirmation',
+    pro: false,
+    message: 'Payment reference received. We will unlock Pro as soon as the credit is confirmed.'
+  });
+}
+
+function handleUpiStatus(res, reqUrl) {
+  const ref = String(reqUrl.searchParams.get('ref') || '').slice(0, 64);
+  const deviceId = String(reqUrl.searchParams.get('deviceId') || '').slice(0, 80);
+  if (!ref && !deviceId) return fail(res, 400, 'ref or deviceId required');
+
+  const order = ref ? orders.get(ref) : null;
+  const ent = entitlements.get(order ? order.deviceId : deviceId);
+  const pro = Boolean(ent && ent.pro && (!ent.expires || ent.expires > Date.now()));
+
+  if (!order) {
+    if (pro) return ok(res, { pro: true, status: 'paid', plan: ent.plan });
+    return ok(res, { pro: false, status: 'none' });
+  }
+  return ok(res, {
+    pro,
+    status: pro ? 'paid' : order.status,
+    ref: order.orderId,
+    plan: order.planId,
+    amount: order.amount,
+    utr: order.utr || null,
+    createdAt: order.createdAt,
+    message: pro
+      ? 'Payment confirmed — Pro unlocked.'
+      : order.status === 'awaiting_confirmation'
+        ? 'Reference received, waiting for the bank confirmation.'
+        : 'Waiting for your payment.'
+  });
+}
+
+function listPending() {
+  return orders.list().filter((o) => o.flow === 'direct-upi');
+}
+
+function handleAdminOrders(req, res, reqUrl) {
+  if (!isAdmin(req, reqUrl)) return fail(res, 401, 'Bad or missing admin token');
+  const list = listPending().slice(0, 200).map((o) => ({
+    ref: o.orderId,
+    plan: o.planId,
+    amount: o.amount,
+    status: o.status,
+    utr: o.utr || null,
+    device: o.deviceId,
+    user: o.user,
+    createdAt: o.createdAt,
+    utrSubmittedAt: o.utrSubmittedAt || null
+  }));
+  return ok(res, { orders: list, upiId: merchantUpi.upiId });
+}
+
+async function handleAdminDecision(req, res, reqUrl, ref, decision) {
+  if (!isAdmin(req, reqUrl)) return fail(res, 401, 'Bad or missing admin token');
+  const order = orders.get(ref);
+  if (!order) return fail(res, 404, 'Unknown order');
+
+  if (decision === 'approve') {
+    const ent = grantPro(order, {
+      source: 'upi-verified',
+      status: 'paid',
+      grant: { event: 'MANUAL_VERIFIED', utr: order.utr || null, at: Date.now() }
+    });
+    console.log(`[admin] approved ${ref} -> device ${order.deviceId}`);
+    return ok(res, { ok: true, status: 'paid', plan: ent.plan, deviceId: order.deviceId });
+  }
+
+  orders.update(ref, { status: 'rejected', rejectedAt: Date.now() });
+  console.log(`[admin] rejected ${ref}`);
+  return ok(res, { ok: true, status: 'rejected' });
+}
+
+function adminPage() {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GymFlow payments</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#070a08;color:#e9f2ea;font-family:system-ui,-apple-system,sans-serif;padding:18px}
+h1{font-size:20px;margin:0 0 4px}p.sub{color:#8f9c92;font-size:13px;margin:0 0 16px}
+.card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:14px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.ref{font-family:ui-monospace,monospace;font-size:12px;color:#a3e635}
+.amt{font-size:20px;font-weight:800}
+.meta{font-size:12px;color:#8f9c92;margin-top:6px;line-height:1.5}
+button{border:0;border-radius:11px;padding:10px 14px;font-weight:700;font-size:13px;cursor:pointer}
+.ok{background:linear-gradient(180deg,#b6ef4d,#8fd11f);color:#0a1206}
+.no{background:rgba(248,113,113,.16);color:#fca5a5;border:1px solid rgba(248,113,113,.35)}
+.pill{display:inline-block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:6px;background:rgba(56,189,248,.16);color:#7dd3fc}
+.pill.paid{background:rgba(163,230,53,.18);color:#a3e635}
+input{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0b120d;color:#e9f2ea;margin-bottom:10px}
+</style></head><body>
+<h1>GymFlow payment console</h1>
+<p class="sub">Money going to <strong id="upi">…</strong> · approve a payment only after you see the credit in your bank app.</p>
+<div id="login" class="card" style="display:none">
+  <input id="tok" type="password" placeholder="admin token (ADMIN_TOKEN in backend/.env)">
+  <button class="ok" onclick="saveToken()">Open console</button>
+</div>
+<div id="list"></div>
+<div id="msg" class="sub"></div>
+<script>
+const token = new URLSearchParams(location.search).get('token') || localStorage.getItem('gf_admin') || '';
+if (!token) { document.getElementById('login').style.display='block'; }
+function saveToken(){
+  const v = document.getElementById('tok').value.trim();
+  localStorage.setItem('gf_admin', v);
+  location.search = '?token=' + encodeURIComponent(v);
+}
+const fmt = ts => new Date(ts).toLocaleString();
+async function load(){
+  if(!token) return;
+  const r = await fetch('/api/admin/orders?token=' + encodeURIComponent(token));
+  if(r.status === 401){ document.getElementById('login').style.display='block'; document.getElementById('msg').textContent='Token rejected.'; return; }
+  const j = await r.json();
+  document.getElementById('upi').textContent = j.upiId || '';
+  const box = document.getElementById('list');
+  if(!j.orders.length){ box.innerHTML = '<div class="card">No orders yet.</div>'; return; }
+  box.innerHTML = j.orders.map(o => \`
+    <div class="card">
+      <div class="row"><div><span class="pill \${o.status==='paid'?'paid':''}">\${o.status}</span>
+        <div class="ref">\${o.ref}</div></div><div class="amt">₹\${o.amount}</div></div>
+      <div class="meta">\${o.plan} · device \${o.device.replace(/&/g,'&amp;')}\${o.user?' · '+String(o.user).replace(/&/g,'&amp;'):''}<br>
+      UTR: <strong>\${o.utr || 'not entered yet'}</strong><br>
+      created \${fmt(o.createdAt)}\${o.utrSubmittedAt?' · ref submitted '+fmt(o.utrSubmittedAt):''}</div>
+      \${o.status==='paid'?'':\`<div class="row" style="margin-top:10px">
+        <button class="ok" onclick="decide('\${o.ref}','approve')">Approve</button>
+        <button class="no" onclick="decide('\${o.ref}','reject')">Reject</button></div>\`}
+    </div>\`).join('');
+}
+async function decide(ref, action){
+  const r = await fetch('/api/admin/orders/' + ref + '/' + action + '?token=' + encodeURIComponent(token), {method:'POST'});
+  const j = await r.json();
+  document.getElementById('msg').textContent = j.error ? j.error : (action==='approve' ? 'Approved — the phone unlocks within 5s.' : 'Rejected.');
+  load();
+}
+load(); setInterval(load, 8000);
+</script></body></html>`;
+}
+
 /* ------------------------------------------------------------------ */
 /* static files                                                       */
 /* ------------------------------------------------------------------ */
@@ -383,6 +623,8 @@ const server = http.createServer(async (req, res) => {
         gateway: config.provider === 'youpi' ? 'YOUPI PG' : 'mock',
         gatewayConfigured: config.provider === 'youpi' ? youpi.configured : true,
         webhookReady: Boolean(config.youpi.merchantSecret),
+        merchantUpiId: merchantUpi.upiId,
+        adminConsole: Boolean(config.adminToken),
         youpiApiUrl: config.provider === 'youpi' ? config.youpi.apiUrl : null,
         grantOn: config.grantOn,
         time: new Date().toISOString()
@@ -408,6 +650,26 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/entitlement' && req.method === 'GET') return handleEntitlement(res, reqUrl);
     if (pathname === '/api/redeem' && req.method === 'POST') return handleRedeem(req, res);
+
+    if (pathname === '/api/upi/order' && req.method === 'POST') return handleUpiOrder(req, res);
+    if (pathname === '/api/upi/utr' && req.method === 'POST') return handleUpiUtr(req, res);
+    if (pathname === '/api/upi/status' && req.method === 'GET') return handleUpiStatus(res, reqUrl);
+    if (pathname === '/api/admin/orders' && req.method === 'GET') return handleAdminOrders(req, res, reqUrl);
+    const adminDecision = pathname.match(/^\/api\/admin\/orders\/([A-Za-z0-9-]+)\/(approve|reject)$/);
+    if (adminDecision && req.method === 'POST') {
+      return handleAdminDecision(req, res, reqUrl, adminDecision[1], adminDecision[2]);
+    }
+    if (pathname === '/admin') {
+      return send(res, 200, adminPage(), { 'Content-Type': MIME['.html'] });
+    }
+    if (pathname === '/api/upi/config') {
+      return ok(res, {
+        upiId: merchantUpi.upiId,
+        payeeName: merchantUpi.payeeName,
+        merchantCode: merchantUpi.merchantCode,
+        manualApproval: !config.provider || config.provider !== 'youpi' || !youpi.configured
+      });
+    }
 
     const mockMatch = pathname.match(/^\/api\/mock\/pay\/([A-Za-z0-9-]+)$/);
     if (mockMatch && req.method === 'POST') return handleMockPay(res, mockMatch[1]);
@@ -443,6 +705,8 @@ server.listen(config.port, '0.0.0.0', () => {
   console.log(' Grant Pro on     : ' + config.grantOn);
   console.log(' Web app root     : ' + config.webRoot);
   console.log(' Webhook URL      : <public-base>/api/youpi/webhook');
+  console.log(' Collecting to UPI: ' + merchantUpi.upiId);
+  console.log(' Admin console    : /admin' + (config.adminToken ? ' (token configured)' : ' (set ADMIN_TOKEN to enable)'));
   console.log('──────────────────────────────────────────────');
 });
 

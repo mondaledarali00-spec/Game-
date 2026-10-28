@@ -383,3 +383,55 @@ code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 5px;
 
 .onboard { padding-top: 18px; }
 .onboard h2 { font-size: 23px; font-weight: 850; }
+
+/* ---------- direct UPI payment sheet ---------- */
+.upi-box {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 14px 14px 12px;
+  color: #0b120d;
+}
+.upi-box .tiny.muted { color: #4b5a4f; }
+.qr-wrap { display: grid; place-items: center; }
+.upi-qr {
+  width: 240px; height: 240px;
+  image-rendering: pixelated;
+  border-radius: 10px;
+}
+.upi-id-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(11, 18, 13, 0.1);
+}
+.upi-id { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; color: #0b120d; }
+.upi-box .btn-ghost { background: rgba(11, 18, 13, 0.06); border-color: rgba(11, 18, 13, 0.15); color: #0b120d; }
+
+.upi-apps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.upi-app {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 11px 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+.upi-app:first-child {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(180deg, #b6ef4d, #8fd11f);
+  border-color: transparent;
+  color: #0a1206;
+  font-weight: 800;
+}
+.upi-app-icon { font-size: 18px; line-height: 1; }
+.upi-app-label { font-size: 11px; font-weight: 700; text-align: center; }
+.upi-app:first-child .upi-app-label { font-size: 14px; }

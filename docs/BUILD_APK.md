@@ -85,10 +85,10 @@ website. If interception fails on an ancient WebView, the client falls back to
 ## 6. Checking a build
 
 ```bash
-unzip -l release/GymFlow-1.0.1.apk
-$JAVA_HOME/bin/java -jar "$APKSIGNER_JAR" verify --print-certs release/GymFlow-1.0.1.apk
-python3 scripts/zipalign.py release/GymFlow-1.0.1.apk /tmp/check.apk   # alignment
-$JAVA_HOME/bin/java -jar "$APKTOOL_JAR" d release/GymFlow-1.0.1.apk -o /tmp/decoded   # round-trip
+unzip -l release/GymFlow-1.1.0.apk
+$JAVA_HOME/bin/java -jar "$APKSIGNER_JAR" verify --print-certs release/GymFlow-1.1.0.apk
+python3 scripts/zipalign.py release/GymFlow-1.1.0.apk /tmp/check.apk   # alignment
+$JAVA_HOME/bin/java -jar "$APKTOOL_JAR" d release/GymFlow-1.1.0.apk -o /tmp/decoded   # round-trip
 ```
 
 ## 7. Common problems

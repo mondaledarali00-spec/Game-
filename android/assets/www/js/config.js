@@ -12,7 +12,7 @@
    ------------------------------------------------------------------ */
 window.GYMFLOW_CONFIG = {
   appName: 'GymFlow',
-  version: '1.0.1',
+  version: '1.1.0',
   apiBase: '',
   currency: 'INR',
   plans: [
@@ -33,6 +33,16 @@ window.GYMFLOW_CONFIG = {
       features: ['No ads, ever', 'All training programs', 'Progress charts + PR tracking', 'Cloud backup']
     }
   ],
+  /* ---- Direct UPI collection ----------------------------------------
+     Payments go straight to this UPI ID (your own bank account, 0% fee).
+     NOTE: a UPI ID is public information (it is printed on every QR), but it
+     is baked into the APK — change it here and rebuild if it ever changes.
+     You can also override it at runtime from your server (/api/upi/config). */
+  merchant: {
+    upiId: '8089274532@axl',
+    payeeName: 'GymFlow',
+    merchantCode: '7994'
+  },
   supportEmail: 'support@example.com',
   // Set to true only for demos: unlocks the in-app "simulate payment" button.
   demoMode: true

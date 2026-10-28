@@ -742,11 +742,19 @@
       }).join('') +
 
       '<section class="card">' +
+      '  <h3 class="h3">Pay directly to UPI</h3>' +
+      '  <p class="body-text">Every payment goes straight to <strong>' + esc(Pay.merchant().upiId) + '</strong> — ' +
+      'the merchant\'s own bank account. No card, no aggregator, no 2% cut.</p>' +
+      (pending ? '<button class="btn btn-primary btn-block" data-action="resume-payment">Continue my pending payment</button>' : '') +
+      '</section>' +
+
+      '<section class="card">' +
       '  <h3 class="h3">How it works</h3>' +
       '  <ol class="steps">' +
-      '    <li>Tap a plan — we create a secure UPI payment session through <strong>YOUPI PG</strong>, the self-hosted gateway.</li>' +
-      '    <li>Pay from any UPI app (GPay, PhonePe, Paytm, CRED). The gateway confirms from your bank alert.</li>' +
-      '    <li>This app polls the gateway and unlocks Pro automatically. No card details ever touch the app.</li>' +
+      '    <li>Tap a plan — the app builds a UPI request for the merchant\'s UPI ID with a unique reference.</li>' +
+      '    <li>Scan the QR or tap GPay / PhonePe / Paytm and pay from any UPI app.</li>' +
+      '    <li>Enter the 12-digit UTR from your UPI app. The bank credit is matched automatically ' +
+      '     (via a YouPI PG observer) and Pro unlocks on this device within seconds.</li>' +
       '  </ol>' +
       (configured ? '' : '<div class="alert alert-info">Payments are not connected yet. ' +
         '<button class="link" data-action="sheet-gateway">Connect your YouPI UPI gateway</button> ' +
@@ -754,6 +762,8 @@
       (configured ? '<div class="tiny muted" style="margin:2px 0 10px">Connected to <strong>' + esc(Api.apiBase()) + '</strong></div>' : '') +
       (pending ? '<div class="alert alert-info">Order <strong>' + esc(pending.orderId) + '</strong> is waiting for confirmation. ' +
         '<button class="link" data-action="pro-verify">Check now</button></div>' : '') +
+      (Pay.currentUpiOrder() ? '<div class="alert alert-info">UPI payment <strong>' + esc(Pay.currentUpiOrder().ref) + '</strong> is waiting for the bank confirmation. ' +
+        '<button class="link" data-action="resume-payment">Open it</button></div>' : '') +
       '  <div class="row-2" style="margin-top:10px">' +
       '    <button class="btn btn-ghost" data-action="pro-verify">I already paid</button>' +
       '    <button class="btn btn-ghost" data-action="sheet-redeem">Redeem key</button>' +
@@ -1081,6 +1091,21 @@
       /* pro */
       case 'buy': buy(el.getAttribute('data-plan')); break;
       case 'pro-verify': verifyPayment(); break;
+      case 'submit-utr': submitUtr(); break;
+      case 'open-upi': Pay.openExternal(el.getAttribute('data-url')); break;
+      case 'copy-upi': {
+        var upi = el.getAttribute('data-upi');
+        try {
+          if (navigator.clipboard) navigator.clipboard.writeText(upi);
+          toast('UPI ID copied');
+        } catch (e) { toast(upi); }
+        break;
+      }
+      case 'resume-payment': {
+        var openOrder = Pay.currentUpiOrder();
+        if (openOrder) showUpiSheet(openOrder, Pay.plan(openOrder.planId));
+        break;
+      }
       case 'pro-restore': restorePurchase(); break;
       case 'pro-simulate': simulatePayment(); break;
       case 'sheet-redeem': sheetRedeem(); break;
@@ -1161,25 +1186,116 @@
   /* ------------------------------------------------------------------ */
   function buy(planId) {
     var plan = Pay.plan(planId);
-    if (!Api.isConfigured()) {
-      openSheet('<h3 class="h3">Connect your payment gateway first</h3>' +
-        '<p class="body-text">Pro is sold through your own YouPI PG UPI gateway, so the app needs the URL of your GymFlow ' +
-        'bridge server. It takes 3 steps and costs 0% per transaction.</p>' +
-        '<div class="row-2"><button class="btn btn-ghost" data-action="sheet-redeem">I have a key</button>' +
-        '<button class="btn btn-primary" data-action="sheet-gateway">Connect gateway</button></div>');
-      return;
-    }
-    openSheet('<h3 class="h3">Starting secure checkout…</h3>' +
-      '<p class="body-text">' + esc(plan.label) + ' · ₹' + esc(plan.amount.replace('.00', '')) + '</p>' +
-      '<p class="tiny muted">A UPI payment page will open. Come back here after paying.</p>');
-    Pay.startCheckout(planId).then(function (res) {
-      closeSheet();
-      toast('Checkout opened — complete the UPI payment');
-      waitForPayment(res.orderId);
+    openSheet('<h3 class="h3">Preparing your UPI payment…</h3><div class="spinner"></div>');
+    Pay.startDirectUpi(planId).then(function (order) {
+      showUpiSheet(order, plan);
     }).catch(function (err) {
-      openSheet('<h3 class="h3">Could not start payment</h3><p class="body-text">' + esc(err.message) + '</p>' +
-        '<div class="row-2"><button class="btn btn-ghost" data-action="close-sheet">Close</button>' +
-        '<button class="btn btn-primary" data-action="sheet-redeem">Redeem key</button></div>');
+      openSheet('<h3 class="h3">Could not start the payment</h3><p class="body-text">' + esc(err.message) + '</p>' +
+        '<button class="btn btn-ghost btn-block" data-action="close-sheet">Close</button>');
+    });
+  }
+
+  /* The main payment screen: QR + app buttons + UTR verification. */
+  function showUpiSheet(order, plan) {
+    var apps = Pay.appLinks(order.uri);
+    var pending = Pay.currentUpiOrder();
+    var isPro = Store.isPro();
+    openSheet(
+      '<div class="sheet-head"><h3 class="h3">Pay ₹' + esc(String(order.amount).replace(/\.00$/, '')) + ' by UPI</h3>' +
+      '<button class="icon-btn" data-action="close-sheet">✕</button></div>' +
+
+      '<div class="upi-box">' +
+      '  <div class="qr-wrap"><canvas id="upi-qr" class="upi-qr"></canvas></div>' +
+      '  <p class="tiny muted center" style="margin:8px 0 0">Scan with any UPI app, or tap a button below</p>' +
+      '  <div class="upi-id-row">' +
+      '    <div><span class="tiny muted">Paying to</span><div class="upi-id">' + esc(order.upiId) + '</div></div>' +
+      '    <button class="btn btn-ghost btn-sm" data-action="copy-upi" data-upi="' + esc(order.upiId) + '">Copy</button>' +
+      '  </div>' +
+      '  <p class="tiny muted center" style="margin:6px 0 0">Reference <strong>' + esc(order.ref) + '</strong></p>' +
+      '</div>' +
+
+      '<div class="upi-apps">' +
+      apps.map(function (a) {
+        return '<button class="upi-app" data-action="open-upi" data-url="' + esc(a.url) + '">' +
+          '<span class="upi-app-icon">' + a.icon + '</span>' +
+          '<span class="upi-app-label">' + esc(a.label) + '</span></button>';
+      }).join('') +
+      '</div>' +
+
+      (order.offline
+        ? '<div class="alert alert-info">You are offline, so this payment cannot be verified automatically. ' +
+          'Pay, then send the reference <strong>' + esc(order.ref) + '</strong> to the developer, or connect a server in Settings.</div>'
+        : '') +
+
+      '<section class="card" style="margin-top:12px">' +
+      '  <h3 class="h3">Already paid? Enter the reference</h3>' +
+      '  <p class="tiny muted">Open your UPI app → transaction details → copy the 12-digit UTR / reference number.</p>' +
+      '  <label class="field" style="margin-top:8px"><span>12-digit UTR</span>' +
+      '  <input id="utr-input" type="tel" inputmode="numeric" maxlength="12" placeholder="e.g. 412345678901"></label>' +
+      '  <button class="btn btn-primary btn-block" data-action="submit-utr">Verify my payment</button>' +
+      '  <div id="utr-status" class="tiny muted" style="margin-top:8px">' +
+      (order.offline ? 'Automatic verification needs a payment server.' : 'We check with your bank alert automatically — no need to wait on a human.') +
+      '  </div>' +
+      '</section>' +
+
+      '<p class="tiny muted center" style="margin-top:10px">' +
+      'Money goes straight to the merchant\'s own bank account via UPI. ' +
+      'GymFlow never sees your card or UPI PIN.' +
+      '</p>'
+    );
+
+    // draw the QR after the sheet is in the DOM
+    setTimeout(function () {
+      var canvas = document.getElementById('upi-qr');
+      if (!canvas) return;
+      try {
+        var qr = QR.encode(order.uri);
+        QR.renderToCanvas(canvas, qr, { margin: 3, size: 240, dark: '#0b120d', light: '#ffffff' });
+      } catch (e) {
+        canvas.parentNode.innerHTML = '<p class="tiny err">Could not draw the QR (' + esc(e.message) + ')</p>';
+      }
+    }, 0);
+
+    // resume watching an order that is already waiting for confirmation
+    var open = Pay.currentUpiOrder();
+    if (!isPro && open && !order.offline) {
+      Pay.watchUpiOrder(open.ref, function (tick) {
+        var el = document.getElementById('utr-status');
+        if (!el) return;
+        if (tick.error) el.textContent = 'Waiting… (' + tick.error + ')';
+        else if (tick.status === 'awaiting_confirmation') el.innerHTML = '<span class="ok">Reference received.</span> Waiting for the bank confirmation…';
+        else el.textContent = 'Status: ' + (tick.status || 'waiting');
+      }).then(function (r) {
+        if (r && r.pro) { closeSheet(); render(); toast('Payment confirmed — Pro unlocked 🎉'); }
+      });
+    }
+  }
+
+  function submitUtr() {
+    var order = Pay.currentUpiOrder();
+    var input = document.getElementById('utr-input');
+    var out = document.getElementById('utr-status');
+    var utr = (input && input.value || '').trim();
+    if (!order) { toast('Start a payment first', 'err'); return; }
+    if (out) out.textContent = 'Checking…';
+    Pay.submitUtr(order.ref, utr).then(function (res) {
+      if (res && res.pro) {
+        closeSheet(); render(); toast('Payment verified — Pro unlocked 🎉');
+        return;
+      }
+      if (out) {
+        out.innerHTML = res && res.offline
+          ? '<span class="err">Saved on this device only.</span> Connect a payment server so the merchant can verify it.'
+          : '<span class="ok">Reference received.</span> ' + (res && res.message ? esc(res.message) : '') +
+            '<br>This screen updates by itself — you can also close it and keep training.';
+      }
+      if (!res || !res.offline) {
+        Pay.watchUpiOrder(order.ref, null).then(function (r) {
+          if (r && r.pro) { closeSheet(); render(); toast('Payment confirmed — Pro unlocked 🎉'); }
+        });
+      }
+    }).catch(function (err) {
+      if (out) out.innerHTML = '<span class="err">' + esc(err.message) + '</span>';
     });
   }
 
