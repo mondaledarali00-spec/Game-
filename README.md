@@ -7,7 +7,7 @@ self-hosted **YOUPI PG** UPI gateway ([youpi-pg/YouPI-PG](https://github.com/you
 
 | | |
 |---|---|
-| **APK** | [`release/GymFlow-1.0.0.apk`](release/GymFlow-1.0.0.apk) — signed (v1+v2+v3), 76 KB |
+| **APK** | [`release/GymFlow-1.0.1.apk`](release/GymFlow-1.0.1.apk) — signed (v1+v2+v3), 76 KB |
 | **Package** | `com.gymflow.app` · minSdk 21 (Android 5.0+) · targetSdk 34 |
 | **Web app** | `webapp/` — plain HTML/CSS/JS, no build step, bundled inside the APK |
 | **Backend** | `backend/server.mjs` — Node 20+, zero dependencies, merchant bridge to YOUPI PG |
@@ -102,7 +102,7 @@ with a constant-time compare, exactly as documented in their `openapi.yaml`.
 ```bash
 bash scripts/setup-toolchain.sh          # downloads JDK-less fallback + apktool/apksigner jars
 export JAVA_HOME=... APKTOOL_JAR=... APKSIGNER_JAR=...
-bash scripts/build-apk.sh                # -> release/GymFlow-1.0.0.apk
+bash scripts/build-apk.sh                # -> release/GymFlow-1.0.1.apk
 ```
 
 Details, signing keys and versioning: **[docs/BUILD_APK.md](docs/BUILD_APK.md)**.
@@ -116,7 +116,7 @@ Otherwise the app starts fully offline and the URL can be pasted in
 **More → Cloud & payments server** (saved per device, no rebuild needed).
 
 ### Install on the phone
-1. Copy `release/GymFlow-1.0.0.apk` to the phone (Drive / USB / `adb install -r`).
+1. Copy `release/GymFlow-1.0.1.apk` to the phone (Drive / USB / `adb install -r`).
 2. Open it → Android asks to allow "install unknown apps" for that app → allow.
 3. GymFlow appears in the launcher. No Google Play, no account, no permissions
    beyond internet + vibration.
@@ -178,7 +178,7 @@ docs/
   SETUP_YOUPI.md        gateway setup, merchant webhook, going public
   BUILD_APK.md          toolchain, signing, releasing updates
 release/
-  GymFlow-1.0.0.apk     the signed APK
+  GymFlow-1.0.1.apk     the signed APK
   keystore/             your release key — back it up, never commit the password
 ```
 
@@ -193,7 +193,33 @@ curl localhost:8787/api/health
 The UI was validated headlessly (signup → onboarding → workout → Pro unlock →
 re-login persistence) before packaging.
 
-## 8. Honest limitations
+## 8. If the app says "keeps stopping"
+
+The 1.0.1 build is hardened against the two things that normally cause that:
+
+1. **No exotic WebView plumbing.** The app now loads `file:///android_asset/www/index.html`
+   directly — no virtual-origin interception, no `shouldInterceptRequest`, no
+   `setDatabaseEnabled`.
+2. **A native error screen instead of a crash.** `MainActivity.onCreate` is wrapped
+   in a `Throwable` guard, so if the WebView cannot start the app shows the error
+   text on a dark screen instead of dying.
+
+Every build is also machine-checked before it ships:
+
+```bash
+python3 scripts/verify_apk.py release/GymFlow-1.0.1.apk
+#  package / launcher activity / label / icon / dex classes / native shell methods
+#  bundled assets / resources.arsc alignment / v2+v3 signature
+```
+
+Install checklist:
+- The app is called **GymFlow** and its icon is a **lime dumbbell on a dark green
+  rounded square**. A crash dialog naming some other app is not this APK.
+- Uninstall any older GymFlow (1.0.0) first — or just install 1.0.1 over it, same key.
+- If MIUI/HyperOS still kills it: Settings → Apps → GymFlow → Battery → **No restrictions**,
+  and make sure **Android System WebView** is updated/enabled in the Play Store.
+
+## 9. Honest limitations
 
 - The UI layer is a WebView app, not native Compose/Flutter: fast and tiny (76 KB),
   but no native gestures/widgets. The native shell only hosts the web app.

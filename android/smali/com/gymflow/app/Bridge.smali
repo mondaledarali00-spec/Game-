@@ -56,7 +56,7 @@
     .annotation runtime Landroid/webkit/JavascriptInterface;
     .end annotation
 
-    const-string v0, "{\"platform\":\"android\",\"shell\":\"webview\",\"app\":\"GymFlow\",\"version\":\"1.0.0\",\"versionCode\":1}"
+    const-string v0, "{\"platform\":\"android\",\"shell\":\"webview\",\"app\":\"GymFlow\",\"version\":\"1.0.1\",\"versionCode\":2}"
 
     return-object v0
 .end method

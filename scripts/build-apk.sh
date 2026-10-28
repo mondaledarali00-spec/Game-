@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 APP_NAME="GymFlow"
-VERSION="1.0.0"
+VERSION="1.0.1"
 OUT_DIR="$ROOT/release"
 KEYSTORE_DIR="$ROOT/release/keystore"
 KEYSTORE="$KEYSTORE_DIR/gymflow-release.jks"
@@ -72,6 +72,10 @@ APK="$OUT_DIR/${APP_NAME}-${VERSION}.apk"
   --out "$APK" "$OUT_DIR/${APP_NAME}-aligned.apk" | sed 's/^/    /'
 
 "$JAVA" -jar "$APKSIGNER_JAR" verify --print-certs "$APK" 2>/dev/null | sed 's/^/    /' | head -6
+
+echo "==> verifying the build (manifest, dex, assets, alignment, signature)"
+"$PYTHON" scripts/verify_apk.py "$APK" | sed 's/^/    /'
+
 
 rm -f "$OUT_DIR/${APP_NAME}-unaligned.apk" "$OUT_DIR/${APP_NAME}-aligned.apk"
 

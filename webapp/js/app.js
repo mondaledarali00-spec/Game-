@@ -748,7 +748,10 @@
       '    <li>Pay from any UPI app (GPay, PhonePe, Paytm, CRED). The gateway confirms from your bank alert.</li>' +
       '    <li>This app polls the gateway and unlocks Pro automatically. No card details ever touch the app.</li>' +
       '  </ol>' +
-      (configured ? '' : '<div class="alert">No payment server configured yet. Set it in <strong>More → Cloud server</strong>, or use a licence key below.</div>') +
+      (configured ? '' : '<div class="alert alert-info">Payments are not connected yet. ' +
+        '<button class="link" data-action="sheet-gateway">Connect your YouPI UPI gateway</button> ' +
+        '— takes 3 steps. No server? Use a licence key below.</div>') +
+      (configured ? '<div class="tiny muted" style="margin:2px 0 10px">Connected to <strong>' + esc(Api.apiBase()) + '</strong></div>' : '') +
       (pending ? '<div class="alert alert-info">Order <strong>' + esc(pending.orderId) + '</strong> is waiting for confirmation. ' +
         '<button class="link" data-action="pro-verify">Check now</button></div>' : '') +
       '  <div class="row-2" style="margin-top:10px">' +
@@ -893,6 +896,35 @@
         '<p class="tiny muted">' + esc(e.cue) + '</p></div>' +
         '<button class="btn btn-ghost btn-sm" data-action="quick-start-ex" data-ex="' + e.id + '">Start</button></li>';
     }).join('') + '</ul>';
+  }
+
+  function sheetGateway() {
+    var configured = Api.isConfigured();
+    openSheet(
+      '<div class="sheet-head"><h3 class="h3">Connect your UPI payment gateway</h3>' +
+      '<button class="icon-btn" data-action="close-sheet">✕</button></div>' +
+      '<p class="body-text">GymFlow collects Pro payments through <strong>YouPI PG</strong>, a self-hosted UPI gateway. ' +
+      'Money goes straight to your bank account — 0% platform fee. Three steps:</p>' +
+      '<ol class="steps">' +
+      '  <li><strong>Run YouPI PG</strong> on a server or PC and create a merchant. ' +
+      '     Put your UPI ID (VPA, e.g. <code>name@okhdfcbank</code>) in the merchant settings there — ' +
+      '     the UPI ID lives in the gateway, never in this app.</li>' +
+      '  <li><strong>Set the webhook</strong> in the YouPI merchant admin to ' +
+      '     <code>&lt;your-server&gt;/api/youpi/webhook</code>.</li>' +
+      '  <li><strong>Paste your GymFlow server URL</strong> below (the bridge that talks to YouPI).</li>' +
+      '</ol>' +
+      '<label class="field" style="margin-top:12px"><span>Your GymFlow server URL</span>' +
+      '<input id="gateway-url" type="url" autocapitalize="off" placeholder="https://gym.mydomain.com" value="' + esc(Api.apiBase()) + '"></label>' +
+      '<div class="row-2">' +
+      '  <button class="btn btn-ghost" data-action="gateway-save">Save &amp; test</button>' +
+      '  <button class="btn btn-primary" data-action="gateway-docs">Watch how-to</button>' +
+      '</div>' +
+      '<div id="gateway-status" class="tiny muted" style="margin-top:10px">' +
+      (configured ? 'Currently connected to ' + esc(Api.apiBase()) : 'No server configured yet — the app runs in offline mode.') +
+      '</div>' +
+      '<p class="tiny muted" style="margin-top:14px">No server? You can still sell Pro with ' +
+      '<button class="link" data-action="sheet-redeem">licence keys</button> — they work with zero internet.</p>'
+    );
   }
 
   function sheetRedeem() {
@@ -1052,6 +1084,11 @@
       case 'pro-restore': restorePurchase(); break;
       case 'pro-simulate': simulatePayment(); break;
       case 'sheet-redeem': sheetRedeem(); break;
+      case 'sheet-gateway': sheetGateway(); break;
+      case 'gateway-save': gatewaySave(); break;
+      case 'gateway-docs':
+        Pay.openExternal('https://www.youtube.com/results?search_query=YouPI+PG+UPI+payment+gateway+setup');
+        break;
       case 'redeem-submit': submitRedeem(); break;
       case 'ad-remove': go('pro'); break;
       case 'ad-cta': {
@@ -1125,11 +1162,11 @@
   function buy(planId) {
     var plan = Pay.plan(planId);
     if (!Api.isConfigured()) {
-      openSheet('<h3 class="h3">Payment server not set</h3>' +
-        '<p class="body-text">GymFlow needs your YOUPI PG bridge URL to collect real payments. You can:<br>' +
-        '1. add it in <strong>More → Cloud server</strong>, or<br>2. redeem a licence key that works offline.</p>' +
-        '<div class="row-2"><button class="btn btn-ghost" data-action="close-sheet">Later</button>' +
-        '<button class="btn btn-primary" data-action="sheet-redeem">I have a key</button></div>');
+      openSheet('<h3 class="h3">Connect your payment gateway first</h3>' +
+        '<p class="body-text">Pro is sold through your own YouPI PG UPI gateway, so the app needs the URL of your GymFlow ' +
+        'bridge server. It takes 3 steps and costs 0% per transaction.</p>' +
+        '<div class="row-2"><button class="btn btn-ghost" data-action="sheet-redeem">I have a key</button>' +
+        '<button class="btn btn-primary" data-action="sheet-gateway">Connect gateway</button></div>');
       return;
     }
     openSheet('<h3 class="h3">Starting secure checkout…</h3>' +
@@ -1219,6 +1256,29 @@
   /* ------------------------------------------------------------------ */
   /* settings / backup actions                                           */
   /* ------------------------------------------------------------------ */
+  function gatewaySave() {
+    var url = ((document.getElementById('gateway-url') || {}).value || '').trim();
+    Api.setApiBase(url);
+    var out = document.getElementById('gateway-status');
+    if (!url) {
+      if (out) out.innerHTML = 'Cleared — back to offline mode.';
+      toast('Offline mode');
+      return;
+    }
+    if (out) out.textContent = 'Testing ' + url + ' …';
+    Api.health().then(function (res) {
+      var gateway = (res && res.gateway) || 'unknown';
+      var ready = res && res.webhookReady;
+      if (out) out.innerHTML = '<span class="ok">Connected</span> · gateway: ' + esc(gateway) +
+        (ready ? ' · webhook ready' : ' · <span class="err">webhook secret missing on the server</span>');
+      toast('Payment gateway connected 🎉');
+      render();
+    }).catch(function (err) {
+      if (out) out.innerHTML = '<span class="err">Could not reach that server:</span> ' + esc(err.message) +
+        '<br>Check the URL, that the bridge is running, and that it uses https.';
+    });
+  }
+
   function saveSettings() {
     var patch = {
       name: (document.getElementById('set-name') || {}).value || 'Athlete',

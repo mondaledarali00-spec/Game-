@@ -13,6 +13,19 @@ GymFlow APK ──► GymFlow backend ──► YOUPI PG payment API ──► U
 
 ---
 
+## 0. Video / written walkthroughs
+
+- YouTube (search): <https://www.youtube.com/results?search_query=YouPI+PG+UPI+payment+gateway+setup>
+- Short intro — "Apna UPI Payment Gateway Banao FREE Me": <https://www.youtube.com/shorts/pveuYE5PHA0>
+- "Build Your Own UPI Checkout? Meet YouPI-PG": <https://www.youtube.com/shorts/tXdpmQIr0tM>
+- "Self-hosted UPI checkout setup": <https://www.youtube.com/shorts/XeGgK0XN6Cs>
+- Written install guide: <https://academy.webotapp.com/how-to-install-youpi-pg-free-upi-payment-gateway>
+- Official repo docs: <https://github.com/youpi-pg/YouPI-PG>
+
+> The videos cover installing YouPI PG and creating a merchant. Everything after
+> that — the UPI VPA, the webhook URL and the server URL you paste into GymFlow —
+> is in sections 2–4 below.
+
 ## 1. Run YOUPI PG
 
 ```bash
@@ -167,7 +180,26 @@ node scripts/gen-license.mjs --offline --plan pro_year --days 365
 Redeem in the app: **Pro → Redeem key** (also in More). Online keys go through
 `POST /api/redeem`; offline keys are validated on the device.
 
-## 9. Troubleshooting
+## 9. Where does my UPI ID go?
+
+**Not in the APK.** Your UPI ID (VPA, e.g. `yourname@okhdfcbank`) is entered in
+the **YouPI PG merchant admin** (`http://<gateway>:6001`) under the merchant's
+receiving account / VPA. That is what the generated QR encodes.
+
+The app only knows your GymFlow bridge URL (`/api/checkout`), which in turn knows
+the YouPI merchant id + secret. This is deliberate: putting a VPA in an APK means
+anyone who unpacks the app can read it, and it cannot be rotated without a new
+build.
+
+So the three values you need are:
+
+| Value | Where it lives | Where it goes |
+|---|---|---|
+| UPI ID / VPA | YouPI merchant admin | (stays there) |
+| Merchant UUID + webhook secret | YouPI merchant admin | `backend/.env` |
+| GymFlow bridge URL | your server | app → **Pro → Connect your YouPI UPI gateway** |
+
+## 10. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
