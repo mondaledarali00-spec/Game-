@@ -36,6 +36,12 @@ preserved — see [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md), [LICENSE](
 |---|---|
 | <img src="docs/screenshots/01-home-light-rev2.jpg" width="260" alt="Home screen, light theme"> | <img src="docs/screenshots/00-style-reference.png" width="380" alt="Liquid glass style reference"> |
 
+### More app screens
+
+| Subscriptions | You: history and playlists |
+|---|---|
+| <img src="docs/screenshots/04-subscriptions-light.jpg" width="260" alt="Subscriptions screen in the light theme"> | <img src="docs/screenshots/05-you-light.jpg" width="260" alt="You screen showing history, playlists and downloads"> |
+
 Two device screenshots are kept as evidence of bugs that were found and fixed in later revisions — they are
 history, not the current look:
 
