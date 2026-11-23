@@ -1,0 +1,26 @@
+package com.hhst.youtubelite.downloader.resolve
+
+import com.hhst.youtubelite.extractor.Extractor
+import com.hhst.youtubelite.diagnostics.DiagnosticCoroutineContext
+import kotlin.coroutines.coroutineContext
+
+/**
+ * Shared [Extractor] access for downloads. [catalog] joins the in-flight parse
+ * (same `/player` as playback). [refresh] uses [Extractor.awaitFreshMedia] so a
+ * 403 retry does not cancel/replace playback's in-flight slot or write stream
+ * URLs into the playback cache. Cancelling the caller cancels only the wait.
+ */
+class SharedExtractorCatalogSource(
+    private val extractor: Extractor,
+) : DownloadCatalogSource {
+    override fun scope(): String = extractor.recoveryScope()
+    override suspend fun catalog(videoId: String): DownloadCatalog {
+        val (metadata, stream) = extractor.awaitMedia(videoId, coroutineContext[DiagnosticCoroutineContext]?.diagnostic)
+        return DownloadCatalog.from(metadata, stream)
+    }
+
+    override suspend fun refresh(videoId: String): DownloadCatalog {
+        val (metadata, stream) = extractor.awaitFreshMedia(videoId, coroutineContext[DiagnosticCoroutineContext]?.diagnostic)
+        return DownloadCatalog.from(metadata, stream)
+    }
+}

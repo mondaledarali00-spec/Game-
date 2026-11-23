@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <!-- Material restart_alt: circular reset arrow, not a clock. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M480,200V40L280,240l200,200V280c132.4,0 240,107.6 240,240s-107.6,240 -240,240s-240,-107.6 -240,-240H160c0,176.8 143.2,320 320,320s320,-143.2 320,-320S656.8,200 480,200z" />
+</vector>

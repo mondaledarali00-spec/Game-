@@ -1,0 +1,165 @@
+package com.hhst.youtubelite.core
+
+import com.hhst.youtubelite.diagnostics.AppLog
+
+import android.app.Activity
+import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.os.Build
+import android.os.SystemClock
+import android.util.Rational
+import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * Suppress / restore API 31+ auto-PiP when a download trampoline (or any
+ * overlay activity) must take the foreground. API 26–30 uses a short
+ * leave-hint window instead of [PictureInPictureParams.setAutoEnterEnabled].
+ */
+object PipAutoEnter {
+    private const val LEGACY_SUPPRESS_MS = 1_500L
+
+    private val suppressCount = AtomicInteger(0)
+    private val host = AtomicReferenceHolder()
+
+    /** In-app navigation handoffs still waiting for their destination; released per [suppressForNavigation]. */
+    private val handoffs = ArrayList<Activity>()
+
+    @Volatile
+    var legacySuppressUntil: Long = 0L
+        private set
+
+    fun isSuppressed(): Boolean = suppressCount.get() > 0
+
+    fun register(activity: Activity) {
+        host.set(activity)
+    }
+
+    fun unregister(activity: Activity) {
+        host.clearIf(activity)
+    }
+
+    fun suppress(): Handle {
+        suppressCount.incrementAndGet()
+        noteLegacyLaunch()
+        // Push auto-enter off without forgetting lastEligible, so restore can
+        // re-enable it if ENABLE_PIP / player eligibility still wants PiP.
+        host.get()?.let { pushParams(it, autoEnter = false) }
+        return Handle { restore() }
+    }
+
+    /**
+     * A short hold for an in-app navigation transition: auto-PiP stays off
+     * while the destination starts up. Released as soon as any other activity
+     * resumes (the destination owns the screen, not the source coming back),
+     * plus on the source's own resume or destroy (the returned [Handle]).
+     */
+    fun suppressForNavigation(owner: Activity): Handle {
+        synchronized(handoffs) { handoffs.add(owner) }
+        suppress()
+        return Handle { releaseNavigation(owner) }
+    }
+
+    private fun releaseNavigation(owner: Activity) {
+        val released = synchronized(handoffs) {
+            val before = handoffs.size
+            handoffs.removeAll { it === owner }
+            before - handoffs.size
+        }
+        repeat(released) { restore() }
+    }
+
+    /** The resumed activity now owns the foreground: drop every other handoff. */
+    fun onActivityResumed(resumed: Activity) {
+        val released = synchronized(handoffs) {
+            val before = handoffs.size
+            handoffs.removeAll { it !== resumed }
+            before - handoffs.size
+        }
+        repeat(released) { restore() }
+    }
+
+    fun restore() {
+        if (suppressCount.decrementAndGet() < 0) suppressCount.set(0)
+        host.get()?.let { activity ->
+            pushParams(activity, autoEnter = !isSuppressed() && lastEligible)
+        }
+    }
+
+    @Volatile
+    private var lastEligible: Boolean = false
+
+    fun noteLegacyLaunch() {
+        legacySuppressUntil = SystemClock.elapsedRealtime() + LEGACY_SUPPRESS_MS
+    }
+
+    fun shouldAutoEnter(eligible: Boolean, sdk: Int): Boolean {
+        lastEligible = eligible
+        if (sdk < Build.VERSION_CODES.S) return false
+        return eligible && !isSuppressed()
+    }
+
+    @Volatile
+    var lastPushError: String? = null
+        private set
+
+    @Volatile
+    var lastRequestedAutoEnter: Boolean = false
+        private set
+
+    fun apply(activity: Activity, autoEnter: Boolean, aspect: Rational? = null, actions: List<RemoteAction>? = null) {
+        // While an overlay holds suppress, PlaybackActivity.syncPipParams still
+        // calls apply(false); keep lastEligible as the unsuppressed desire.
+        if (!isSuppressed()) {
+            lastEligible = autoEnter
+        }
+        pushParams(activity, autoEnter, aspect, actions)
+    }
+
+    private fun pushParams(activity: Activity, autoEnter: Boolean, aspect: Rational? = null, actions: List<RemoteAction>? = null) {
+        if (!PipSupport.isSupported(activity)) {
+            lastRequestedAutoEnter = false
+            lastPushError = null
+            return
+        }
+        val builder = PictureInPictureParams.Builder()
+        if (aspect != null) builder.setAspectRatio(aspect)
+        if (actions != null) builder.setActions(actions)
+        val enable = autoEnter && !isSuppressed()
+        lastRequestedAutoEnter = enable
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(enable)
+        }
+        val result = runCatching { activity.setPictureInPictureParams(builder.build()) }
+        result.onFailure { AppLog.event(AppLog.Category.APP, "pip_params_failed", mapOf("auto_enter" to enable), it) }
+        lastPushError = result.exceptionOrNull()?.let { it.javaClass.simpleName + ": " + it.message }
+    }
+
+    fun isAutoEnterEnabled(activity: Activity): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        return runCatching {
+            val params = Activity::class.java.getMethod("getPictureInPictureParams").invoke(activity)
+                ?: return false
+            params.javaClass.getMethod("isAutoEnterEnabled").invoke(params) as Boolean
+        }.getOrDefault(false)
+    }
+
+    fun interface Handle {
+        fun restore()
+    }
+
+    private class AtomicReferenceHolder {
+        @Volatile
+        private var ref: WeakReference<Activity>? = null
+
+        fun set(activity: Activity) {
+            ref = WeakReference(activity)
+        }
+
+        fun get(): Activity? = ref?.get()
+
+        fun clearIf(activity: Activity) {
+            if (ref?.get() === activity) ref = null
+        }
+    }
+}

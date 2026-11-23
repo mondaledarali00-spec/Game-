@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The optional sandbox is only loaded on API 26+; older systems use WebView. -->
+    <uses-sdk tools:overrideLibrary="androidx.javascriptengine" />
+    <uses-feature android:name="android.software.picture_in_picture" android:required="false" />
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- LAN Cast discovery and the local media proxy. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <application
+        android:name=".App"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.App"
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic">
+        <!-- Device discovery and transport control require HTTP to local renderer addresses. -->
+
+        <service android:name=".extractor.EjsRuntimeService"
+            android:exported="false" android:process=":youtube_ejs" />
+
+        <activity
+            android:name=".home.HomeActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.App.Home"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Route external playback links before composing or loading the home feed. -->
+        <activity
+            android:name=".navigation.ContentLinkActivity"
+            android:exported="true"
+            android:theme="@style/Theme.App.Home">
+            <!-- autoVerify=false: this app does not own the domains, so no App Link verification. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="youtube.com" />
+                <data android:host="www.youtube.com" />
+                <data android:host="m.youtube.com" />
+                <data android:host="music.youtube.com" />
+                <data android:host="youtu.be" />
+            </intent-filter>
+            <!-- text/plain is intentionally broad: intent filters cannot match URL content;
+                 non-link shares are handled by the home screen. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".playlist.PlaylistActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".library.YouActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".library.HistoryActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".library.PlaylistsActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".settings.SettingsActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".settings.AdvancedActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".account.SignInActivity" android:exported="false" android:theme="@style/Theme.App.Home" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".account.ChatWebSignInActivity" android:exported="false" android:theme="@style/Theme.App.Home" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".core.TrafficVerificationActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity android:name=".subscriptions.SubscriptionsActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+
+        <!-- Standalone shorts browse host; playback reuses the shared player ViewModel hooks. -->
+        <activity android:name=".shorts.ShortsActivity" android:exported="false" android:theme="@style/Theme.App.Shorts" android:windowSoftInputMode="adjustResize" />
+
+        <activity android:name=".explore.ExploreActivity" android:exported="false" android:theme="@style/Theme.App.Home" />
+        <activity
+            android:name=".search.SearchResultsActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.App.Home" />
+
+        <activity
+            android:name=".watch.WatchActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:supportsPictureInPicture="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+            android:exported="false"
+            android:theme="@style/Theme.App.Watch" />
+
+        <!-- Local channel page; it opens a typed request for every later destination. -->
+        <activity
+            android:name=".channel.ChannelActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.App.Home" />
+
+        <!-- Shared post detail host used by both the Home post card and channel Posts. -->
+        <activity
+            android:name=".post.PostDetailActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false"
+            android:theme="@style/Theme.App.Home" />
+
+        <activity
+            android:name=".downloader.ui.DownloadShareActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/download"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.App">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.about.AboutActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App" />
+        <activity android:name=".gallery.GalleryActivity" android:exported="false" android:theme="@style/Theme.App" />
+        <activity
+            android:name=".downloader.ui.DownloadActionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.App" />
+
+        <activity
+            android:name=".downloader.ui.DownloadActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.App"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".downloader.ui.DownloadSheetActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App.DownloadSheet"
+            android:windowSoftInputMode="adjustResize" />
+
+        <receiver
+            android:name=".downloader.ui.DownloadActionReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".player.service.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".downloader.engine.DownloadUidtJobService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing"
+            tools:node="merge" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.download.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/download_file_paths" />
+        </provider>
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+    </application>
+</manifest>
