@@ -1,0 +1,41 @@
+package com.hhst.youtubelite.player.engine
+
+internal object PlaybackProgress {
+    const val SAFE_ZONE_MS = 5_000L
+
+    enum class Write { SKIP, SAVE, CLEAR }
+
+    /**
+     * Near start: skip (replay from 0). Mid-roll: save. Near/at end or
+     * [playbackEnded]: clear so a finished video cannot resume mid-roll.
+     */
+    fun write(positionMs: Long, durationMs: Long, playbackEnded: Boolean): Write {
+        if (playbackEnded) return Write.CLEAR
+        if (durationMs > 0 && positionMs >= durationMs - SAFE_ZONE_MS) return Write.CLEAR
+        if (durationMs > 0 && positionMs > SAFE_ZONE_MS && positionMs < durationMs - SAFE_ZONE_MS) {
+            return Write.SAVE
+        }
+        return Write.SKIP
+    }
+
+    fun clampStartMs(startMs: Long, durationMs: Long): Long {
+        if (startMs <= 0L) return 0L
+        if (durationMs <= 0L) return startMs
+        return startMs.coerceAtMost((durationMs - 1L).coerceAtLeast(0L))
+    }
+
+    /** Explicit share `t=` (including 0) beats [rememberedMs]; applied once per load. */
+    fun resolveStartMs(explicitStartMs: Long?, rememberedMs: Long, durationMs: Long, remoteMs: Long? = null): Long {
+        val remote = remoteMs?.takeIf { it >= 0 }?.let {
+            if (durationMs > 0 && it >= durationMs - SAFE_ZONE_MS) 0L else it
+        }
+        val raw = explicitStartMs ?: remote ?: rememberedMs
+        return clampStartMs(raw, durationMs)
+    }
+
+    fun cacheKey(videoId: String, owner: String): String {
+        val identity = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(owner.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }
+        return "player:progress:$identity:$videoId"
+    }
+}

@@ -1,0 +1,32 @@
+.gradle/
+.gradle-user-home/
+.android-user-home/
+.codegraph/
+.android/
+.kotlin/
+.idea/
+build/
+external/
+**/build/
+out/
+release/
+app/release/
+local.properties
+*.log
+*.apk
+*.iml
+*.iws
+*.ipr
+*.patch
+
+/scripts/
+
+# --- Towfik Youtube additions -------------------------------------------------
+# The release binary is tracked on purpose (see dist/README.md). Remove this
+# block, and the dist/ folder, if you prefer to attach APKs to a Release.
+!dist/*.apk
+# never commit signing material or local SDK paths
+*.keystore
+*.jks
+keystore.properties
+*.pass

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Towfik Youtube — Liquid Glass Blue · design preview</title>
+<style>
+  :root{
+    --blue:#0A84FF; --blue-deep:#0A6FE0;
+    --ink:#0B1B2E; --muted:#4E6480;
+    --hair:rgba(255,255,255,.72);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#0b1220;color:#eaf2ff;padding:28px 18px 60px;
+  }
+  h1{font-size:19px;font-weight:800;letter-spacing:-.2px;text-align:center}
+  .sub{font-size:12.5px;color:#8fa6c4;text-align:center;margin-top:6px;line-height:1.5;max-width:620px;margin-inline:auto}
+  .note{font-size:11.5px;color:#6d84a3;text-align:center;margin-top:10px}
+  .stage{display:flex;gap:30px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+
+  /* ---------- phone shell ---------- */
+  .phone{
+    width:300px;height:620px;border-radius:38px;position:relative;overflow:hidden;
+    border:8px solid #1c2433;box-shadow:0 26px 60px rgba(0,0,0,.55);
+    display:flex;flex-direction:column;
+  }
+  .light{
+    background:linear-gradient(160deg,#E8F1FF 0%,#F6FAFF 34%,#E3EEFF 66%,#F2F8FF 100%);
+    color:#0B1B2E;
+  }
+  .dark{
+    background:linear-gradient(160deg,#070E1A 0%,#0C1A2E 40%,#081020 70%,#0A1526 100%);
+    color:#EDF4FF;
+  }
+  .label{text-align:center;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7d93b1;margin-bottom:8px;font-weight:700}
+
+  /* ---------- glass primitives (same recipe as LiquidGlass.kt) ---------- */
+  .glass-light{
+    background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(233,242,255,.94));
+    border:1px solid rgba(255,255,255,.72);
+    box-shadow:0 8px 22px rgba(32,74,127,.20), inset 0 1px 0 rgba(255,255,255,.95);
+    backdrop-filter:blur(14px) saturate(160%);
+  }
+  .glass-dark{
+    background:linear-gradient(180deg,rgba(30,48,77,.96),rgba(16,29,51,.90));
+    border:1px solid rgba(255,255,255,.20);
+    box-shadow:0 8px 22px rgba(255, 255,255,.20), inset 0 1px 0 rgba(191,220,255,.40);
+    backdrop-filter:blur(14px) saturate(160%);
+  }
+  .accent-light{background:linear-gradient(180deg,#3D9BFF,#0A6FE0);border:1px solid rgba(255,255,255,.55);
+    box-shadow:0 8px 18px rgba(10,111,224,.38), inset 0 1px 0 rgba(255,255,255,.55);color:#fff}
+  .accent-dark{background:linear-gradient(180deg,#6FB4FF,#3D8BE0);border:1px solid rgba(255,255,255,.40);
+    box-shadow:0 8px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.55);color:#06121F}
+
+  /* ---------- top bar ---------- */
+  .topbar{margin:14px 12px 0;height:48px;border-radius:24px;display:flex;align-items:center;padding:0 10px 0 12px;gap:8px}
+  .brand{width:26px;height:26px;border-radius:8px;flex:0 0 auto;
+    background:linear-gradient(150deg,#4DA3FF,#0A84FF 55%,#0057C8);
+    display:grid;place-items:center;box-shadow:0 3px 8px rgba(10,132,255,.45), inset 0 1px 0 rgba(255,255,255,.6)}
+  .brand svg{width:12px;height:12px}
+  .wordmark{font-size:15.5px;font-weight:900;letter-spacing:-.4px}
+  .search{margin-left:auto;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;opacity:.75}
+  .chipdot{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.5}
+
+  /* ---------- chips ---------- */
+  .chips{display:flex;gap:9px;padding:12px 16px 4px;overflow:hidden}
+  .chip{font-size:11.5px;font-weight:600;padding:7px 13px;border-radius:16px;white-space:nowrap}
+  .chip.sel{font-weight:700}
+  .chip-glass-light{background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(233,242,255,.90));
+    border:1px solid rgba(255,255,255,.9);box-shadow:0 3px 9px rgba(32,74,127,.14)}
+  .chip-glass-dark{background:linear-gradient(180deg,rgba(30,48,77,.95),rgba(16,29,51,.88));
+    border:1px solid rgba(255,255,255,.14);box-shadow:0 3px 9px rgba(0,0,0,.35)}
+
+  /* ---------- feed ---------- */
+  .feed{flex:1;overflow:hidden;padding:10px 16px 0;display:flex;flex-direction:column;gap:13px}
+  .card{display:flex;flex-direction:column;gap:6px}
+  .thumb{position:relative;width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;
+    border:1px solid rgba(255,255,255,.35);box-shadow:0 6px 16px rgba(32,74,127,.18)}
+  .dark .thumb{box-shadow:0 6px 16px rgba(0,0,0,.5);border-color:rgba(255,255,255,.10)}
+  .thumb::after{content:"";position:absolute;inset:0;border-radius:18px;
+    background:linear-gradient(135deg,rgba(255,255,255,.28),rgba(255,255,255,0) 42%)}
+  .t1{background:linear-gradient(140deg,#7FB6FF,#0A84FF 55%,#0B4FA8)}
+  .t2{background:linear-gradient(140deg,#9ED8FF,#3AA0E8 50%,#0C3E7A)}
+  .dur{position:absolute;right:8px;bottom:8px;font-size:9.5px;font-weight:700;color:#fff;
+    background:rgba(6,18,32,.72);border:1px solid rgba(255,255,255,.22);padding:1px 6px;border-radius:6px;z-index:2}
+  .crow{display:flex;gap:8px;align-items:flex-start}
+  .ava{width:26px;height:26px;border-radius:50%;flex:0 0 auto;
+    background:linear-gradient(140deg,#BFE0FF,#5AA8F0);border:1px solid rgba(255,255,255,.6)}
+  .title{font-size:11.5px;font-weight:700;line-height:1.35}
+  .meta{font-size:9.5px;opacity:.62;margin-top:2px}
+
+  /* ---------- bottom dock ---------- */
+  .dock{margin:auto 12px 10px;height:56px;border-radius:26px;display:flex;align-items:center}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:8.5px;font-weight:600;opacity:.72}
+  .tab.on{opacity:1;color:var(--blue)}
+  .dark .tab.on{color:#6FB4FF}
+  .ic{width:17px;height:17px;border-radius:5px;border:1.6px solid currentColor;opacity:.95}
+  .tab.on .ic{background:currentColor;border-color:currentColor;opacity:.18}
+  .pill{width:26px;height:3px;border-radius:2px;background:currentColor;margin-bottom:5px}
+
+  /* ---------- liquid sheen (mirrors Modifier.liquidSheen in LiquidGlass.kt) ---------- */
+  @keyframes waterSweep{0%{transform:translateX(-145%)}100%{transform:translateX(165%)}}
+  @keyframes waterDrift{0%,100%{transform:translate(-6%,6%) scale(1)}50%{transform:translate(22%,-10%) scale(1.22)}}
+  .topbar,.dock,.chip.sel{position:relative;overflow:hidden;isolation:isolate}
+  .topbar::before,.dock::before,.chip.sel::before{
+    content:"";position:absolute;inset:-40% -10%;z-index:-1;pointer-events:none;
+    background:linear-gradient(100deg,transparent 36%,rgba(255,255,255,.60) 50%,transparent 64%);
+    animation:waterSweep 7.2s linear infinite;
+  }
+  .dock::before{animation-duration:9.6s;opacity:.62;background:linear-gradient(100deg,transparent 38%,rgba(200,228,255,.55) 50%,transparent 62%)}
+  .chip.sel::before{animation-duration:5.2s;inset:-60% -10%;opacity:.55;
+    background:linear-gradient(100deg,transparent 34%,rgba(255,255,255,.45) 50%,transparent 66%)}
+  .topbar::after,.dock::after{
+    content:"";position:absolute;left:-26%;top:-55%;width:58%;height:210%;border-radius:50%;z-index:-1;
+    background:radial-gradient(circle,rgba(95,168,245,.34),rgba(95,168,245,0) 70%);
+    animation:waterDrift 15s ease-in-out infinite;pointer-events:none;
+  }
+  .dark .topbar::before,.dark .dock::before{background:linear-gradient(100deg,transparent 38%,rgba(156,208,255,.30) 50%,transparent 62%)}
+  .dark .topbar::after,.dark .dock::after{background:radial-gradient(circle,rgba(95,168,245,.26),rgba(95,168,245,0) 70%)}
+  @media (prefers-reduced-motion:reduce){
+    .topbar::before,.dock::before,.chip.sel::before,.topbar::after,.dock::after{animation:none;opacity:.35}
+  }
+</style>
+</head>
+<body>
+  <h1>Towfik Youtube — Liquid Glass Blue</h1>
+  <p class="sub">Rendered from the exact colour, radius, border and gradient values compiled into the APK
+  (<code>LiquidGlass.kt</code>, <code>Color.kt</code>, <code>AppPalette.kt</code>).</p>
+  <p class="note">This is a design preview, not a screenshot of the running app — nothing here was captured from a device.</p>
+
+  <div class="stage">
+    <!-- LIGHT -->
+    <div>
+      <div class="label">Light · frost</div>
+      <div class="phone light">
+        <div class="topbar glass-light">
+          <div class="brand">
+            <svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <div class="wordmark">Towfik Youtube</div>
+          <div class="search">⌕</div>
+        </div>
+
+        <div class="chips">
+          <div class="chip chip-glass-light">☰</div>
+          <div class="chip chip-glass-light sel accent-light">All</div>
+          <div class="chip chip-glass-light">Music</div>
+          <div class="chip chip-glass-light">Gaming</div>
+          <div class="chip chip-glass-light">News</div>
+        </div>
+
+        <div class="feed">
+          <div class="card">
+            <div class="thumb t1"><span class="dur">12:04</span></div>
+            <div class="crow">
+              <div class="ava"></div>
+              <div>
+                <div class="title">Liquid glass, done properly</div>
+                <div class="meta">Towfik Studio · 214K views · 2 days ago</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="thumb t2"><span class="dur">8:41</span></div>
+            <div class="crow">
+              <div class="ava"></div>
+              <div>
+                <div class="title">Blue gradients that still read as text</div>
+                <div class="meta">Towfik Studio · 88K views · 5 days ago</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock glass-light">
+          <div class="tab on"><div class="ic"></div>Home</div>
+          <div class="tab"><div class="ic"></div>Shorts</div>
+          <div class="tab"><div class="ic"></div>Subscriptions</div>
+          <div class="tab"><div class="ic"></div>You</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DARK -->
+    <div>
+      <div class="label">Dark · midnight</div>
+      <div class="phone dark">
+        <div class="topbar glass-dark">
+          <div class="brand">
+            <svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <div class="wordmark">Towfik Youtube</div>
+          <div class="search">⌕</div>
+        </div>
+
+        <div class="chips">
+          <div class="chip chip-glass-dark">☰</div>
+          <div class="chip chip-glass-dark sel accent-dark">All</div>
+          <div class="chip chip-glass-dark">Music</div>
+          <div class="chip chip-glass-dark">Gaming</div>
+          <div class="chip chip-glass-dark">News</div>
+        </div>
+
+        <div class="feed">
+          <div class="card">
+            <div class="thumb t1"><span class="dur">12:04</span></div>
+            <div class="crow">
+              <div class="ava"></div>
+              <div>
+                <div class="title">Liquid glass, done properly</div>
+                <div class="meta">Towfik Studio · 214K views · 2 days ago</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="thumb t2"><span class="dur">8:41</span></div>
+            <div class="crow">
+              <div class="ava"></div>
+              <div>
+                <div class="title">Blue gradients that still read as text</div>
+                <div class="meta">Towfik Studio · 88K views · 5 days ago</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock glass-dark">
+          <div class="tab on"><div class="ic"></div>Home</div>
+          <div class="tab"><div class="ic"></div>Shorts</div>
+          <div class="tab"><div class="ic"></div>Subscriptions</div>
+          <div class="tab"><div class="ic"></div>You</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
